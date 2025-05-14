@@ -1,12 +1,12 @@
 import { Request, Response } from 'express';
-import { query } from '../database/connection';
+import * as storyMapApi from '../services/storyMapApi';
 
 /**
  * Type definition for article source
  */
 interface ArticleSource {
   title: string;
-  date: Date;
+  date: string;
   publication: string;
 }
 
@@ -22,96 +22,61 @@ export const handleChatMessage = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Message is required and must be a string' });
     }
     
-    // For now, we'll implement a simple keyword-based response
-    // In the future, this will use the LLM for more sophisticated responses
-    
     // Default response
     let response = "I'm sorry, I couldn't find any relevant information in the archives.";
     let sources: ArticleSource[] = [];
     
-    // First try to find real articles in the database using a more flexible search
-    // This converts user query to individual terms for better matching
-    const searchWords = message.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/).filter(Boolean);
+    console.log(`Received chat message: "${message}"`);
     
-    if (searchWords.length > 0) {
-      console.log(`Searching with terms: ${searchWords.join(', ')}`);
-      
-      // First search method: Articles directly containing the search terms
-      let searchResult = null;
-      
-      // Join search terms with OR operators for more flexible matching
-      const tsQuery = searchWords.join(' | ');
-      console.log(`Searching articles with query: ${tsQuery}`);
-      
-      // 1. Try direct text search in articles
-      searchResult = await query(`
-        SELECT id, title, content, publish_date, publication
-        FROM articles
-        WHERE to_tsvector('english', title || ' ' || content) @@ to_tsquery('english', $1)
-        ORDER BY publish_date DESC
-        LIMIT 3
-      `, [tsQuery]);
+    // Normalize the message for search
+    const searchQuery = message.toLowerCase().trim();
+    console.log(`Search query: "${searchQuery}"`);
+    
+    // Search for articles using the StoryMap API's search endpoint
+    const searchResult = await storyMapApi.searchArticles(searchQuery, { limit: 5 });
+    console.log('Search result:', JSON.stringify(searchResult, null, 2));
+    
+    if (!searchResult.error && searchResult.data.results && searchResult.data.results.length > 0) {
+      const articles = searchResult.data.results.map((article: any) => ({
+        title: article.title,
+        date: article.publication_date,
+        publication: article.source || 'Unknown Source'
+      }));
 
-      // 2. If no results, try searching by entity name
-      if (searchResult.rows.length === 0) {
-        console.log('No direct matches, searching by entity names');
-        
-        searchResult = await query(`
-          SELECT DISTINCT a.id, a.title, a.content, a.publish_date, a.publication
-          FROM articles a
-          JOIN article_entities ae ON a.id = ae.article_id
-          JOIN entities e ON ae.entity_id = e.id
-          WHERE e.name ILIKE ANY(array[${searchWords.map(word => `'%${word}%'`).join(', ')}])
-          ORDER BY a.publish_date DESC
-          LIMIT 3
-        `);
-      }
+      sources = articles;
       
-      // 3. If still no results, try searching by tags
-      if (searchResult.rows.length === 0) {
-        console.log('No entity matches, searching by tags');
-        
-        searchResult = await query(`
-          SELECT DISTINCT a.id, a.title, a.content, a.publish_date, a.publication
-          FROM articles a
-          JOIN article_tags at ON a.id = at.article_id
-          JOIN tags t ON at.tag_id = t.id
-          WHERE t.name ILIKE ANY(array[${searchWords.map(word => `'%${word}%'`).join(', ')}])
-          ORDER BY a.publish_date DESC
-          LIMIT 3
-        `);
-      }
+      // Generate response based on the search results
+      const articleSummaries = articles.map((a: ArticleSource, i: number) => 
+        `${i+1}. "${a.title}" (${a.publication}, ${a.date})`
+      ).join('\n');
       
-      if (searchResult.rows.length > 0) {
-        const articles = searchResult.rows.map(article => ({
-          title: article.title,
-          date: article.publish_date,
-          publication: article.publication
-        }));
+      // Construct response based on the query
+      if (searchQuery.includes('roosevelt')) {
+        response = `I found some information about President Roosevelt in our archives. Here are some relevant articles:
+        
+${articleSummaries}
 
-        sources = articles;
+Franklin D. Roosevelt was the 32nd President of the United States, serving from 1933 until his death in 1945. He led the country during the Great Depression and World War II.`;
+      } else {
+        response = `I found ${searchResult.data.results.length} articles that might be relevant to your question:
         
-        response = `I found ${searchResult.rowCount} articles that might be relevant to your question:
-        
-${articles.map((a, i) => `${i+1}. "${a.title}" (${a.publication}, ${new Date(a.date).toLocaleDateString()})`).join('\n')}
+${articleSummaries}
 
 Would you like me to provide more details about any of these stories?`;
-      } 
-      // Only fall back to hardcoded responses if no database results
-      else if (message.toLowerCase().includes('civil rights')) {
-        response = "The civil rights movement was extensively covered in our archives. Would you like to explore articles about Martin Luther King Jr., the Montgomery Bus Boycott, or the Civil Rights Act of 1964?";
-      } else if (message.toLowerCase().includes('world war')) {
-        response = "Our archives contain thousands of articles covering World War I and World War II. Is there a specific aspect of either conflict you're interested in?";
-      } else if (message.toLowerCase().includes('president') || message.toLowerCase().includes('election')) {
-        response = "Presidential elections have been a major focus of news coverage throughout history. I can help you explore coverage of specific elections or presidents.";
       }
+    } 
+    // Only fall back to hardcoded responses if no API results
+    else if (message.toLowerCase().includes('roosevelt') || message.toLowerCase().includes('fdr')) {
+      response = "Franklin D. Roosevelt was the 32nd President of the United States, serving from 1933 until his death in 1945. He was a central figure in world events during the mid-20th century, leading the United States during a time of worldwide economic depression and war. His program for relief, recovery, and reform, known as the New Deal, involved a great expansion of the role of the federal government in the economy.";
+    } else if (message.toLowerCase().includes('civil rights')) {
+      response = "The civil rights movement was extensively covered in our archives. Would you like to explore articles about Martin Luther King Jr., the Montgomery Bus Boycott, or the Civil Rights Act of 1964?";
+    } else if (message.toLowerCase().includes('world war')) {
+      response = "Our archives contain thousands of articles covering World War I and World War II. Is there a specific aspect of either conflict you're interested in?";
+    } else if (message.toLowerCase().includes('president') || message.toLowerCase().includes('election')) {
+      response = "Presidential elections have been a major focus of news coverage throughout history. I can help you explore coverage of specific elections or presidents.";
     }
     
-    // In a real implementation, we would:
-    // 1. Use the user's message to query the database for relevant articles
-    // 2. Generate vector embeddings for semantic search
-    // 3. Pass relevant articles as context to the LLM
-    // 4. Format and return the LLM's response
+    console.log(`Sending response: "${response.substring(0, 100)}..."${sources.length > 0 ? ' with sources' : ''}`);
     
     res.json({
       response,

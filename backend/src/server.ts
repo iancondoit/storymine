@@ -2,7 +2,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { router as apiRouter } from './routes/api';
-import { setupDatabase } from './database/connection';
+import { pingStoryMapApi } from './services/storyMapApi';
 
 // Load environment variables
 dotenv.config();
@@ -46,9 +46,15 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
 // Start server
 const startServer = async () => {
   try {
-    // Initialize database connection
-    await setupDatabase();
-    console.log('Database connection established');
+    // Check StoryMap API availability
+    console.log('Checking StoryMap API availability...');
+    
+    const apiUrl = await pingStoryMapApi();
+    if (apiUrl) {
+      console.log(`✅ Successfully connected to StoryMap API at ${apiUrl}`);
+    } else {
+      console.warn('⚠️ Warning: Unable to connect to StoryMap API. Some features may not work correctly.');
+    }
 
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);

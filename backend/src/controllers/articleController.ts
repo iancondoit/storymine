@@ -1,81 +1,38 @@
 import { Request, Response } from 'express';
-import { query } from '../database/connection';
+import * as storyMapApi from '../services/storyMapApi';
 
 /**
  * Get a list of articles with pagination
  */
 export const getArticles = async (req: Request, res: Response) => {
   try {
-    const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
+    const page = parseInt(req.query.page as string) || 1;
     const offset = (page - 1) * limit;
     
-    // Optional filters
-    const publication = req.query.publication as string;
-    const fromDate = req.query.from as string;
-    const toDate = req.query.to as string;
-    const section = req.query.section as string;
+    // Map query parameters for StoryMap API
+    const apiParams = {
+      limit,
+      offset,
+      // Map any additional filters 
+      ...(req.query.publication && { publication: req.query.publication }),
+      ...(req.query.from && { from_date: req.query.from }),
+      ...(req.query.to && { to_date: req.query.to }),
+      ...(req.query.section && { category: req.query.section })
+    };
     
-    // Build where clause based on filters
-    let whereClause = '';
-    const params: any[] = [];
-    let paramCount = 1;
+    // Call StoryMap API
+    const result = await storyMapApi.getArticles(apiParams);
     
-    if (publication) {
-      whereClause += `publication = $${paramCount} `;
-      params.push(publication);
-      paramCount++;
+    if (result.error) {
+      return res.status(result.error ? 500 : 200).json({ 
+        error: result.error ? 'Error fetching articles from StoryMap API' : null 
+      });
     }
     
-    if (fromDate) {
-      whereClause += whereClause ? 'AND ' : '';
-      whereClause += `publish_date >= $${paramCount} `;
-      params.push(fromDate);
-      paramCount++;
-    }
-    
-    if (toDate) {
-      whereClause += whereClause ? 'AND ' : '';
-      whereClause += `publish_date <= $${paramCount} `;
-      params.push(toDate);
-      paramCount++;
-    }
-    
-    if (section) {
-      whereClause += whereClause ? 'AND ' : '';
-      whereClause += `section = $${paramCount} `;
-      params.push(section);
-      paramCount++;
-    }
-    
-    if (whereClause) {
-      whereClause = 'WHERE ' + whereClause;
-    }
-    
-    // Query to get paginated articles
-    const queryText = `
-      SELECT id, title, publish_date, publication, section, word_count
-      FROM articles
-      ${whereClause}
-      ORDER BY publish_date DESC
-      LIMIT $${paramCount} OFFSET $${paramCount + 1}
-    `;
-    
-    // Add pagination parameters
-    params.push(limit, offset);
-    
-    // Count total matching articles for pagination
-    const countText = `
-      SELECT COUNT(*) as total
-      FROM articles
-      ${whereClause}
-    `;
-    
-    // Execute both queries
-    const articlesResult = await query(queryText, params);
-    const countResult = await query(countText, params.slice(0, paramCount - 1));
-    
-    const totalArticles = parseInt(countResult.rows[0].total);
+    // Transform the response to match our expected format
+    const articles = result.data.articles || [];
+    const totalArticles = result.data.total || articles.length;
     const totalPages = Math.ceil(totalArticles / limit);
     
     res.json({
@@ -83,10 +40,43 @@ export const getArticles = async (req: Request, res: Response) => {
       limit,
       totalArticles,
       totalPages,
-      articles: articlesResult.rows
+      articles: articles.map((article: any) => ({
+        id: article.id,
+        title: article.title,
+        publish_date: article.publication_date,
+        publication: article.source,
+        section: article.category,
+        word_count: article.word_count || 0
+      }))
     });
   } catch (error) {
     console.error('Error fetching articles:', error);
     res.status(500).json({ error: 'Failed to fetch articles' });
+  }
+};
+
+/**
+ * Get a single article by ID
+ */
+export const getArticle = async (req: Request, res: Response) => {
+  try {
+    const articleId = req.params.id;
+    
+    // Call StoryMap API
+    const result = await storyMapApi.getArticleById(articleId);
+    
+    if (result.error) {
+      return res.status(404).json({ 
+        error: `Article with ID ${articleId} not found or error accessing StoryMap API` 
+      });
+    }
+    
+    // Transform the article to our expected format if needed
+    const article = result.data;
+    
+    res.json(article);
+  } catch (error) {
+    console.error(`Error fetching article with ID ${req.params.id}:`, error);
+    res.status(500).json({ error: 'Failed to fetch article' });
   }
 }; 

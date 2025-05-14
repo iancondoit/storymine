@@ -6,12 +6,12 @@ dotenv.config();
 
 // Database connection configuration
 const dbConfig = {
-  // For StoryMap production database
-  user: process.env.DB_USER || 'storymine_app',
-  password: process.env.DB_PASSWORD || 'access_needed', // This should be provided securely
-  host: process.env.DB_HOST || 'storymap-db.internal.domain', 
+  // Use local database by default for development
+  user: process.env.DB_USER || 'postgres',
+  password: process.env.DB_PASSWORD || 'postgres',
+  host: process.env.DB_HOST || 'localhost', 
   port: parseInt(process.env.DB_PORT || '5432'),
-  database: process.env.DB_NAME || 'storymap',
+  database: process.env.DB_NAME || 'storymine_local',
   // Handle SSL configuration
   ssl: process.env.DB_SSL_MODE === 'require' ? 
     { rejectUnauthorized: false } : 
@@ -58,14 +58,15 @@ export const setupDatabase = async (): Promise<void> => {
     await client.query('SELECT NOW()');
     console.log('Connected to PostgreSQL database');
     
-    // Only create tables and seed data if we're using a development database
-    const isLocalDevelopment = dbConfig.host === 'localhost';
+    // Consider all non-production environments as local development
+    const isLocalDevelopment = process.env.NODE_ENV !== 'production';
     if (isLocalDevelopment) {
       // Create tables if they don't exist
       await createTables();
       
       // Seed sample data if needed
       await seedSampleData();
+      console.log('Local development setup complete - created tables and seeded data');
     } else {
       console.log('Connected to production database - skipping table creation and sample data seeding');
     }

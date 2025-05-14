@@ -1,81 +1,47 @@
 import { Request, Response } from 'express';
-import { query } from '../database/connection';
+import * as storyMapApi from '../services/storyMapApi';
 
 /**
  * Search articles using semantic search
- * This implements a placeholder that will be enhanced later
+ * This routes the search query to the StoryMap API
  */
 export const searchArticles = async (req: Request, res: Response) => {
   try {
     const searchQuery = req.query.query as string;
     const limit = parseInt(req.query.limit as string) || 10;
-    const page = parseInt(req.query.page as string) || 1;
-    const offset = (page - 1) * limit;
+    const threshold = parseFloat(req.query.threshold as string) || 0.7;
     const searchType = req.path.split('/').pop(); // Extract 'semantic', 'keyword', or 'hybrid'
     
     if (!searchQuery) {
       return res.status(400).json({ error: 'Search query is required' });
     }
     
-    // For now, this is a simple keyword search as we don't have the vector DB set up yet
-    // This will be replaced with proper semantic search implementation
-    let queryText: string;
-    let params: any[];
+    // Call the StoryMap API search endpoint
+    const result = await storyMapApi.searchArticles(searchQuery, {
+      limit,
+      threshold,
+      search_type: searchType // Pass the search type to the API if it supports it
+    });
     
-    switch (searchType) {
-      case 'semantic':
-        // Placeholder for semantic search
-        // In a real implementation, this would use vector similarity search
-        queryText = `
-          SELECT id, title, content, publish_date, publication, section
-          FROM articles
-          WHERE to_tsvector('english', title || ' ' || content) @@ plainto_tsquery('english', $1)
-          ORDER BY ts_rank(to_tsvector('english', title || ' ' || content), plainto_tsquery('english', $1)) DESC
-          LIMIT $2 OFFSET $3
-        `;
-        params = [searchQuery, limit, offset];
-        break;
-        
-      case 'keyword':
-        // Standard keyword search
-        queryText = `
-          SELECT id, title, content, publish_date, publication, section
-          FROM articles
-          WHERE to_tsvector('english', title || ' ' || content) @@ plainto_tsquery('english', $1)
-          ORDER BY ts_rank(to_tsvector('english', title || ' ' || content), plainto_tsquery('english', $1)) DESC
-          LIMIT $2 OFFSET $3
-        `;
-        params = [searchQuery, limit, offset];
-        break;
-        
-      case 'hybrid':
-      default:
-        // Placeholder for hybrid search
-        // In a real implementation, this would combine vector similarity with keyword search
-        queryText = `
-          SELECT id, title, content, publish_date, publication, section
-          FROM articles
-          WHERE to_tsvector('english', title || ' ' || content) @@ plainto_tsquery('english', $1)
-          ORDER BY ts_rank(to_tsvector('english', title || ' ' || content), plainto_tsquery('english', $1)) DESC
-          LIMIT $2 OFFSET $3
-        `;
-        params = [searchQuery, limit, offset];
-        break;
+    if (result.error) {
+      return res.status(500).json({ 
+        status: 'error',
+        error: 'Failed to search articles via StoryMap API'
+      });
     }
     
-    const result = await query(queryText, params);
-    
-    // Format the response
-    const articles = result.rows.map(article => ({
+    // Format the response to match our expected format
+    const articles = (result.data.results || []).map((article: any) => ({
       id: article.id,
       title: article.title,
       // Create a snippet from the content
-      snippet: article.content.length > 200 
+      snippet: article.content && article.content.length > 200 
         ? article.content.substring(0, 200) + '...' 
-        : article.content,
-      publish_date: article.publish_date,
-      publication: article.publication,
-      section: article.section
+        : article.content || '',
+      publish_date: article.publication_date,
+      publication: article.source,
+      section: article.category,
+      similarity: article.similarity
     }));
     
     res.json({

@@ -1,16 +1,13 @@
 import express, { Request, Response } from 'express';
-import { getArticles } from '../controllers/articleController';
+import { getArticles, getArticle } from '../controllers/articleController';
 import { searchArticles } from '../controllers/searchController';
 import { getEntities, getEntityRelationships } from '../controllers/entityController';
 import { handleChatMessage } from '../controllers/chatController';
+import { getStoryMapStats } from '../controllers/storyMapController';
 
 export const router = express.Router();
 
 // Placeholders for controllers that haven't been implemented yet
-const getArticle = async (req: Request, res: Response) => {
-  res.status(501).json({ message: 'Not implemented yet' });
-};
-
 const getEntityTimeline = async (req: Request, res: Response) => {
   res.status(501).json({ message: 'Not implemented yet' });
 };
@@ -42,4 +39,7 @@ router.get('/entities/:name/timeline', getEntityTimeline);
 
 // Tags
 router.get('/tags', getTags);
-router.get('/tags/:name/articles', getArticlesByTag); 
+router.get('/tags/:name/articles', getArticlesByTag);
+
+// StoryMap API Status
+router.get('/storymap-stats', getStoryMapStats); 
