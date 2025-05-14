@@ -70,7 +70,12 @@ describe('StoryMap API Service', () => {
         }
       });
       
-      const result = await storyMapApi.searchArticles('invalid query', {});
+      const result = await storyMapApi.searchArticles('invalid query', {}) as {
+        error: boolean;
+        status: number;
+        message: string;
+        data: any;
+      };
       
       expect(result.error).toBe(true);
       expect(result.status).toBe(400);
