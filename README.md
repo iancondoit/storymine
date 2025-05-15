@@ -1,6 +1,146 @@
 # StoryMine
 
-A web application that provides access to carefully separated, cleaned, and analyzed machine-readable historical news articles across hundreds of years of history. StoryMine helps media professionals and researchers discover lost stories from history.
+A web application for exploring historical narratives through genomic data concepts, with an AI assistant named Jordi.
+
+![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
+![License](https://img.shields.io/badge/license-ISC-green.svg)
+
+## Features
+
+- **Dark Mode Theme**: Modern dark-themed interface with scientific/genomic aesthetic
+- **Interactive Components**: DNA-inspired visualizations and UI elements
+- **AI Assistant**: Chat with Jordi, your archival research assistant
+- **Historical Archive**: Explore interconnected historical documents
+- **Responsive Design**: Works on desktop and mobile devices
+
+## Architecture
+
+StoryMine consists of three main components:
+
+1. **Frontend**: Next.js application with React and Tailwind CSS
+2. **Backend**: Node.js API server connecting to the StoryMap API
+3. **StoryMap API**: Python Flask server providing mock historical data
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js (v18+)
+- Python 3.7+
+- npm or yarn
+
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/storymine.git
+cd storymine
+
+# Install dependencies
+npm install
+
+# Install Python dependencies (for StoryMap API)
+pip install flask
+```
+
+### Running the Application
+
+To run the complete application with all three components:
+
+```bash
+npm run dev:all
+```
+
+This will start:
+- The StoryMap API mock server on port 5001
+- The backend server on port 3001
+- The frontend on port 3000 (or next available port)
+
+To run only the frontend and backend without the StoryMap API:
+
+```bash
+npm run dev
+```
+
+## Theme System
+
+StoryMine uses a dark mode theme by default with scientific/genomic styling.
+
+### Theme Features
+
+- Dark mode with accent colors for genomic elements
+- Mathematical/scientific decorations in the background
+- DNA helix representations throughout the UI
+- Custom Tailwind configuration for consistent styling
+
+### Theme Components
+
+- **ThemeProvider**: Context provider for dark/light mode switching
+- **MathDecorations**: Mathematical symbols for background decorations
+- **Logo**: DNA-inspired logo with version display
+- **StoryMapStatus**: Component displaying API connection status
+
+## Development
+
+### Folder Structure
+
+```
+storymine/
+├── frontend/             # Next.js frontend application
+│   ├── public/           # Static assets
+│   └── src/              # Source code
+│       ├── components/   # React components
+│       ├── pages/        # Next.js pages
+│       ├── styles/       # CSS/Tailwind styles
+│       ├── tests/        # Jest tests
+│       ├── types/        # TypeScript types
+│       └── utils/        # Utility functions
+├── backend/              # Node.js backend API
+│   └── src/              # Source code
+└── scripts/              # Utility scripts (including StoryMap API)
+```
+
+### Running Tests
+
+```bash
+# Run all tests
+npm test
+
+# Run frontend tests only
+npm run frontend:test
+
+# Run backend tests only
+npm run backend:test
+
+# Run tests in watch mode (frontend)
+cd frontend && npm run test:watch
+```
+
+### Building for Production
+
+```bash
+# Build all components
+npm run build
+
+# Run in production mode
+npm start
+```
+
+## Contributing
+
+1. Create a feature branch (`git checkout -b feature/amazing-feature`)
+2. Commit your changes (`git commit -m 'Add amazing feature'`)
+3. Push to the branch (`git push origin feature/amazing-feature`)
+4. Open a Pull Request
+
+## License
+
+This project is licensed under the ISC License - see the LICENSE file for details.
+
+## Acknowledgments
+
+- StoryMine uses sample historical data for demonstration purposes
+- DNA visualization inspired by genomic research visualization techniques
 
 ## Overview
 
