@@ -1,6 +1,6 @@
 {
   "name": "storymine",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "Web application for exploring historical news archives with Jordi",
   "scripts": {
     "backend:dev": "cd backend && npm run dev",
@@ -13,7 +13,10 @@
     "build": "npm run backend:build && npm run frontend:build",
     "backend:test": "cd backend && npm test",
     "frontend:test": "cd frontend && npm test",
-    "test": "npm run backend:test && npm run frontend:test"
+    "test": "npm run backend:test && npm run frontend:test",
+    "test:api-client": "cd backend && jest --testPathPattern=tests/services/storyMapApiClient.test.ts",
+    "test:entity-api": "cd backend && jest --testPathPattern=tests/controllers/entityController.test.ts",
+    "test:integration": "cd backend && jest --testPathPattern=tests/integration/storyMapIntegration.test.ts"
   },
   "keywords": [
     "news",
