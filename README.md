@@ -1,13 +1,29 @@
-# StoryMine - Historical Genome Archive
+# StoryMine - Jordi Intelligence System
 
-**Version 1.2.0** | Production-Ready Documentary Story Discovery Platform
+**Version 3.0.0** | Documentary Story Discovery & Development Platform
 
-StoryMine is a sophisticated AI-powered platform that discovers documentary-worthy stories from vast historical archives. Built with Next.js, Express, and powered by Claude AI (Jordi), it analyzes 2.56+ million intelligence records to uncover narrative threads and story connections across time.
+StoryMine is a sophisticated AI-powered platform that transforms **282,388 pre-scored Atlanta Constitution articles (1920-1961)** into actionable documentary story opportunities using Jordi, an intelligence-driven discovery assistant that combines advanced filtering, documentary potential scoring, and contextual conversation.
+
+## 🎬 Jordi Intelligence System
+
+### Overview
+Jordi is StoryMine's AI documentary development assistant that provides:
+- **Smart story discovery** using pre-scored documentary potential ratings
+- **Enhanced filtering** by categories (Politics, Crime, War, Women's Stories, etc.) and year ranges (1920-1961)
+- **Two-tier interface**: Discovery dashboard + story-focused conversation
+- **Production-ready insights**: Documentary development guidance and archival research
+
+### Intelligence Data Foundation
+- **Source**: StoryMap Intelligence Team pre-processed data
+- **Volume**: 282,388 Atlanta Constitution articles with intelligence scoring
+- **Scoring**: Documentary potential (0-100%), narrative richness, archival value
+- **Time Span**: 1920-1961 (41 years of Atlanta history)
+- **Filtering**: 10 story categories + 8 historical time periods
 
 ## 🏗️ System Architecture
 
 ### Overview
-StoryMine integrates three main components in a unified Docker container deployed on Railway:
+StoryMine v3.0 integrates Jordi intelligence capabilities in a unified container:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -16,6 +32,8 @@ StoryMine integrates three main components in a unified Docker container deploye
 │  ┌─────────────────┐    ┌─────────────────┐                │
 │  │   Frontend      │    │    Backend      │                │
 │  │   (Next.js)     │◄──►│   (Express)     │                │
+│  │   /jordi        │    │ /api/narrative  │                │
+│  │   /jordi/story  │    │ Intelligent API │                │
 │  │   Port: 3000    │    │   Port: 3001    │                │
 │  └─────────────────┘    └─────────────────┘                │
 │           │                       │                        │
@@ -26,59 +44,95 @@ StoryMine integrates three main components in a unified Docker container deploye
 └─────────────────────────────────────────────────────────────┘
                                    │
                           ┌────────▼────────┐
-                          │  AWS RDS Postgres│
+                          │ AWS RDS Postgres │
                           │ StoryMap Intel.  │
-                          │  282K articles   │
-                          │  1.06M entities  │
-                          │  1.22M relations │
+                          │ 282K articles    │
+                          │ + Intelligence   │
+                          │ Scoring Data     │
                           └─────────────────┘
 ```
 
-### Core Components
+### Two-Tier Discovery System
 
-#### 1. Frontend (Next.js Static Generation)
-- **Location**: `src/frontend/`
-- **Build Output**: `.next/` static files
-- **Key Features**:
-  - Static site generation for optimal performance
-  - Real-time data display (hardcoded for reliability)
-  - Dark/light theme support
-  - Responsive design with scientific styling
+#### 1. **Story Discovery Dashboard** (`/jordi`)
+- **Enhanced filtering**: Visual category buttons (Politics 🏛️, Crime ⚖️, War 🎖️, Women's Stories 👩, etc.)
+- **Year range selection**: 5-year periods from 1920-1925 through 1955-1961
+- **Documentary scoring**: Color-coded potential ratings (Green 80%+, Yellow 60%+, Orange 40%+)
+- **"Give me more" functionality**: Refresh stories without overwhelming the interface
+- **Story cards**: Title, summary, year, themes, documentary potential percentage
 
-#### 2. Backend (Express API Server)
-- **Location**: `src/backend/`
-- **Port**: 3001 (internal container communication)
-- **Key Features**:
-  - Database connectivity with automatic reconnection
-  - Claude AI integration for Jordi chat
-  - RESTful API endpoints
-  - Comprehensive error handling and logging
+#### 2. **Story-Focused Chat Interface** (`/jordi/story/[storyId]`)
+- **Deep conversation**: Contextual Q&A about specific historical stories
+- **Documentary development**: Production insights, interview strategies, archival research
+- **Historical context**: Period details, significance, connections
+- **Guided conversation**: Suggested questions and development focus areas
 
-#### 3. Database (AWS RDS PostgreSQL)
-- **Host**: `storymap-intelligence-database.c123abc456def.us-east-1.rds.amazonaws.com`
-- **Database**: `storymap_intelligence`
-- **Key Tables**:
-  - `intelligence_articles` (282,388 records)
-  - `intelligence_entities` (1,061,535 records)  
-  - `intelligence_relationships` (1,219,127 records)
+## 🔍 Intelligence API Endpoints
+
+### Core Narrative API (`/api/narrative/*`)
+
+```bash
+# Get curated stories with filtering
+GET /api/narrative/stories?category=women&yearRange=1920-1925&count=10
+
+# Get available categories and year ranges
+GET /api/narrative/categories
+
+# Deep story exploration
+POST /api/narrative/explore
+Body: { storyId: "atlanta-jury-women-1920", focus: "production" }
+
+# Story-focused conversation
+POST /api/narrative/chat  
+Body: { storyId: "story-id", message: "What makes this compelling for documentary?" }
+
+# Refresh story options ("give me more")
+POST /api/narrative/refresh
+Body: { category: "politics", yearRange: "1930-1935", count: 10 }
+
+# System health check
+GET /api/narrative/health
+
+# API documentation
+GET /api/narrative/docs
+```
+
+### Response Structure
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "atlanta-jury-women-1920",
+      "title": "Women Serve on Atlanta Jury for First Time",
+      "summary": "Historic moment as three women take their seats...",
+      "year": 1920,
+      "category": "Women's Stories",
+      "documentaryPotential": 92,
+      "narrativeScore": 78,
+      "themes": ["Women's Rights", "Legal History", "Social Change"]
+    }
+  ],
+  "metadata": {
+    "source": "intelligence",
+    "category": "women",
+    "yearRange": "1920-1925"
+  }
+}
+```
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 - Node.js 18+
 - Docker (for deployment)
-- PostgreSQL client (for local testing)
 - Railway CLI (for deployment)
 
 ### Environment Variables
 Create `.env` file with:
 ```bash
-# Database Configuration
-DATABASE_HOST=storymap-intelligence-database.c123abc456def.us-east-1.rds.amazonaws.com
-DATABASE_PORT=5432
-DATABASE_NAME=storymap_intelligence
-DATABASE_USER=postgres
-DATABASE_PASSWORD=[provided by StoryMap Intelligence team]
+# Database Configuration (StoryMap Intelligence)
+DATABASE_URL=postgresql://user:pass@host:5432/storymap_intelligence
 
 # AI Configuration  
 ANTHROPIC_API_KEY=[your claude api key]
@@ -93,19 +147,11 @@ PORT=3001
 # Install dependencies
 npm install
 
-# Install backend dependencies
-cd src/backend && npm install && cd ../..
+# Start both backend and frontend
+npm run dev
 
-# Install frontend dependencies  
-cd src/frontend && npm install && cd ../..
-
-# Start backend server
-cd src/backend && npm run dev &
-
-# Start frontend development server
-cd src/frontend && npm run dev
-
-# Open http://localhost:3000
+# Backend runs on :3001, Frontend on :3000
+# Jordi available at http://localhost:3000/jordi
 ```
 
 ### Production Deployment
@@ -113,468 +159,145 @@ cd src/frontend && npm run dev
 # Deploy to Railway
 railway up
 
-# Monitor deployment
-railway logs --tail
+# Check Jordi Intelligence status
+curl https://your-app.railway.app/api/narrative/health
 
-# Check status
-railway status
+# Access story discovery
+open https://your-app.railway.app/jordi
 ```
 
-## 🔍 Database Architecture
+## 📊 Story Categories & Filtering
 
-### Schema Overview
-The StoryMap Intelligence database uses a three-table architecture optimized for historical narrative analysis:
+### Enhanced Category System
 
-#### Core Tables
+1. **📰 All Stories** (general) - Browse all documentary-worthy content
+2. **🏛️ Politics** - Elections, government, political movements, New Deal era
+3. **⚖️ Crime & Justice** - Trials, investigations, law enforcement, court cases
+4. **🎖️ War & Military** - WWI aftermath, WWII buildup, military stories
+5. **💼 Business** - Economy, commerce, industry, Great Depression impact
+6. **⚾ Sports** - Athletics, games, sporting events, cultural significance
+7. **👩 Women's Stories** - Women's rights, suffrage, social change, pioneering figures
+8. **✊ Protests & Reform** - Social movements, strikes, demonstrations, activism
+9. **📚 Education** - Schools, universities, educational reform, literacy
+10. **🎭 Entertainment** - Theater, music, cultural events, arts scene
 
-**intelligence_articles**
-- Primary historical documents and articles
-- Fields: `id`, `title`, `content`, `date_published`, `source`, `created_at`
-- Indexed on: `date_published`, `title`, `content` (full-text search)
+### Historical Time Periods
 
-**intelligence_entities**  
-- People, organizations, locations, events extracted from articles
-- Fields: `id`, `name`, `entity_type`, `description`, `created_at`
-- Types: PERSON, ORGANIZATION, LOCATION, EVENT, CONCEPT
+- **1920-1925**: Post-WWI adjustment, Roaring Twenties begins
+- **1925-1930**: Economic prosperity, cultural transformation
+- **1930-1935**: Great Depression onset, New Deal beginnings  
+- **1935-1940**: New Deal programs, economic recovery efforts
+- **1940-1945**: World War II impact, home front stories
+- **1945-1950**: Post-war transition, veterans return, social change
+- **1950-1955**: Korean War era, economic prosperity returns
+- **1955-1961**: Civil Rights era begins, social transformation
 
-**intelligence_relationships**
-- Many-to-many relationships between articles and entities
-- Fields: `id`, `article_id`, `entity_id`, `relevance_score`, `created_at`
-- Enables entity network analysis and story thread discovery
+## 🤖 Intelligence Implementation
 
-### Data Integrity
-- **282,388 articles** spanning 1920-1961 (42 years)
-- **1,061,535 unique entities** with comprehensive metadata
-- **1,219,127 relationships** enabling complex narrative analysis
-- Referential integrity maintained via foreign key constraints
+### Backend Service Stack
 
-## 🤖 Jordi AI Assistant
+#### Core Service: `claudeNarrativeService.ts`
+```typescript
+// Intelligence-powered story discovery
+async getCuratedStoryOptions(options: {
+  category?: string;
+  yearRange?: string; 
+  count?: number;
+}): Promise<any>
 
-### Overview
-Jordi is StoryMine's Claude-powered AI assistant, specialized in historical analysis and documentary story discovery.
+// Deep story analysis with documentary scoring
+async exploreStoryInDepth(storyId: string, focus?: string): Promise<any>
 
-### Architecture
-- **Backend Integration**: `src/backend/src/controllers/chatController.ts`
-- **AI Provider**: Anthropic Claude (latest model)
-- **Context Window**: Full access to StoryMap Intelligence database
-- **Response Style**: Conversational yet academically rigorous
-
-### Capabilities
-1. **Historical Query Processing**: Natural language questions about people, events, time periods
-2. **Story Thread Discovery**: Identifies narrative connections across time and entities
-3. **Documentary Potential Assessment**: Evaluates stories for documentary viability
-4. **Entity Network Analysis**: Maps relationships between historical figures
-5. **Temporal Analysis**: Tracks developments and changes over time
-
-### API Endpoints
-```
-POST /api/chat
-Body: { message: "Find stories about Roosevelt and Churchill" }
-Response: { response: "...", context: {...} }
+// Story-focused conversation with historical context
+async storyFocusedChat(storyId: string, message: string, history: any[]): Promise<any>
 ```
 
-## 📊 Monitoring & Diagnostics
+#### Smart Database Queries
+- **Documentary potential filtering**: `WHERE documentary_potential > 0.02`
+- **Category-specific searches**: `primary_themes @> '[\"Politics\"]' OR content ILIKE '%politics%'`
+- **Year range precision**: `publication_date BETWEEN '1920-01-01' AND '1925-12-31'`
+- **Intelligent ordering**: `ORDER BY documentary_potential DESC, narrative_score DESC`
 
-### Database Monitoring
+### Frontend Intelligence Interface
+
+#### Story Discovery: `jordi.tsx`
+- **Category button filters**: Visual selection with icons
+- **Year range controls**: Historical period selection
+- **Documentary potential badges**: Color-coded scoring
+- **Story cards**: Complete metadata with themes
+- **Refresh functionality**: "Give me more" without archive overwhelm
+
+#### Story Chat: `jordi/story/[storyId].tsx`  
+- **Story header**: Full context with scoring and themes
+- **Conversational interface**: Real-time documentary development Q&A
+- **Suggested questions**: Guided conversation starters
+- **Historical context**: Period details and significance
+
+## 📈 Documentary Potential Scoring
+
+### Intelligence Scoring System
+Each story includes sophisticated pre-scoring from StoryMap Intelligence:
+
+- **Documentary Potential**: 0-100% rating for visual storytelling viability
+- **Narrative Score**: Story structure and character development quality
+- **Archival Richness**: Available supporting materials and documentation
+- **Evidence Quality**: Source reliability and historical detail level
+
+### Visual Indicators
+- **🟢 Green (80%+)**: Exceptional documentary potential
+- **🟡 Yellow (60-79%)**: High potential with strong elements
+- **🟠 Orange (40-59%)**: Moderate potential, development needed
+- **⚪ Gray (<40%)**: Limited visual/narrative appeal
+
+## 🔧 Monitoring & Operations
+
+### Health Monitoring
 ```bash
-# Continuous monitoring (runs every 30 seconds)
-node scripts/monitor_database_connectivity.js --verbose
+# Check Jordi intelligence status
+curl /api/narrative/health
 
-# One-time health check
-node scripts/monitor_database_connectivity.js --interval=0
-
-# View monitoring logs
-tail -f logs/database_monitoring.log
-```
-
-### Operations Testing
-```bash
-# Test all database operations
-node scripts/test_database_operations.js --verbose
-
-# Quick connectivity test
-node scripts/test_database_operations.js
-
-# View test reports
-cat logs/database_operations_report.json
-```
-
-### Log Files
-- **Database Monitoring**: `logs/database_monitoring.log`
-- **Operations Testing**: `logs/database_operations_test.log`  
-- **Health Reports**: `logs/database_health_report.json`
-- **Railway Logs**: `railway logs`
-
-### Key Metrics
-- **Connection Health**: Response time, success rate, error patterns
-- **Data Integrity**: Record counts, orphaned relationships, date validity
-- **Performance**: Query response times, complex join performance
-- **Uptime**: 24-hour success rate, consecutive failure tracking
-
-## 🔧 API Reference
-
-### Core Endpoints
-
-#### Database Statistics
-```
-GET /api/database/stats
-Response: {
-  articles: 282388,
-  entities: 1061535, 
-  relationships: 1219127,
-  dateRange: {
-    earliest: "1920",
-    latest: "1961", 
-    years: 42
+# Response includes:
+{
+  "status": "optimal|degraded|error",
+  "checks": {
+    "database": true,
+    "intelligence": true,
+    "fallback": true
+  },
+  "capabilities": {
+    "intelligentQueries": true,
+    "categoryFiltering": true,
+    "documentaryScoring": true
   }
 }
 ```
 
-#### Health Check
-```
-GET /api/health
-Response: {
-  status: "healthy",
-  database: "connected",
-  timestamp: "2024-01-01T12:00:00Z"
-}
-```
+### Database Integration Strategy
+- **Development mode**: Uses fallback stories and curated examples
+- **Production activation**: 5-minute switchover to full intelligence once AWS database connected
+- **Graceful degradation**: System remains functional with examples if database unavailable
+- **Smart fallbacks**: Category-specific story examples maintain user experience
 
-#### Jordi Chat
-```
-POST /api/chat  
-Body: { message: "Tell me about World War II intelligence operations" }
-Response: {
-  response: "Based on the StoryMap Intelligence archive...",
-  context: { articlesFound: 1547, entitiesIdentified: 89 }
-}
-```
+## 📖 Documentation
 
-#### Story Discovery
-```
-GET /api/stories/discover?topic=espionage&timeframe=1940-1945
-Response: {
-  stories: [...],
-  narrativeScore: 0.87,
-  documentaryPotential: "high"
-}
-```
+### Complete System Documentation
+- **Jordi Intelligence System**: See `JORDI_INTELLIGENCE_SYSTEM.md` for comprehensive technical details
+- **API Documentation**: Self-documenting at `/api/narrative/docs`
+- **Architecture Diagrams**: System design and data flow documentation
+- **Development Philosophy**: Documentary-first approach and intelligence-driven discovery
 
-## 🏗️ Development Guide
-
-### Project Structure
-```
-StoryMine/
-├── src/
-│   ├── frontend/          # Next.js application
-│   │   ├── src/
-│   │   │   ├── components/   # React components
-│   │   │   ├── pages/       # Next.js pages & API routes
-│   │   │   ├── styles/      # CSS and styling
-│   │   │   └── utils/       # Frontend utilities
-│   │   ├── public/          # Static assets
-│   │   └── package.json     # Frontend dependencies
-│   └── backend/           # Express API server  
-│       ├── src/
-│       │   ├── controllers/ # Route handlers
-│       │   ├── database/    # DB connection & queries
-│       │   ├── models/      # Data models
-│       │   ├── routes/      # API route definitions
-│       │   ├── services/    # Business logic
-│       │   └── utils/       # Backend utilities
-│       └── package.json     # Backend dependencies
-├── scripts/               # Monitoring & testing scripts
-├── logs/                 # Application logs
-├── docs/                 # Documentation
-├── Dockerfile            # Container configuration
-├── railway.json          # Railway deployment config
-└── README.md            # This file
-```
-
-### Adding New Features
-
-#### 1. Database Queries
-Add new queries in `src/backend/src/database/`:
-```javascript
-// src/backend/src/database/storyQueries.js
-async function findDocumentaryStories(criteria) {
-  const query = `
-    SELECT a.*, COUNT(r.entity_id) as entity_count
-    FROM intelligence_articles a
-    JOIN intelligence_relationships r ON a.id = r.article_id
-    WHERE ...
-  `;
-  return await executeQuery(query, [criteria]);
-}
-```
-
-#### 2. API Endpoints
-Add routes in `src/backend/src/routes/`:
-```javascript
-// src/backend/src/routes/stories.js
-router.get('/discover', async (req, res) => {
-  try {
-    const stories = await findDocumentaryStories(req.query);
-    res.json({ stories });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-```
-
-#### 3. Frontend Components
-Add React components in `src/frontend/src/components/`:
-```jsx
-// src/frontend/src/components/StoryDiscovery.tsx
-export default function StoryDiscovery() {
-  const [stories, setStories] = useState([]);
-  
-  useEffect(() => {
-    fetch('/api/stories/discover')
-      .then(res => res.json())
-      .then(setStories);
-  }, []);
-  
-  return <div>{/* Story display logic */}</div>;
-}
-```
-
-### Testing Strategy
-
-#### Unit Tests
-```bash
-# Backend tests
-cd src/backend && npm test
-
-# Frontend tests  
-cd src/frontend && npm test
-```
-
-#### Integration Tests
-```bash
-# Full operations test
-node scripts/test_database_operations.js --verbose
-
-# Database connectivity test
-node scripts/monitor_database_connectivity.js --interval=0
-```
-
-#### Performance Testing
-```bash
-# Stress test database operations
-node scripts/test_database_operations.js --stress
-
-# Monitor under load
-node scripts/monitor_database_connectivity.js --interval=5 --verbose
-```
-
-## 🔐 Security & Access Control
-
-### Database Security
-- **SSL Connection**: Required for all production database connections
-- **Network Security**: AWS Security Group restricts access to Railway IPs
-- **Credentials**: Environment variable based, never hardcoded
-- **Connection Pooling**: Prevents connection exhaustion attacks
-
-### API Security
-- **CORS Configuration**: Restricted to specific origins in production
-- **Rate Limiting**: Implemented to prevent abuse
-- **Input Validation**: All user inputs sanitized and validated
-- **Error Handling**: Generic error messages to prevent information leakage
-
-### Railway Deployment Security
-- **Environment Isolation**: Production environment variables separate from development
-- **Build Security**: Multi-stage Docker builds minimize attack surface
-- **Health Checks**: Automated monitoring for security incidents
-
-## 🚨 Troubleshooting
-
-### Common Issues
-
-#### "Database Connection Failed"
-```bash
-# Check connectivity
-node scripts/monitor_database_connectivity.js --interval=0
-
-# Verify environment variables
-echo $DATABASE_HOST
-echo $DATABASE_PASSWORD
-
-# Test manual connection
-psql -h $DATABASE_HOST -U $DATABASE_USER -d $DATABASE_NAME
-```
-
-#### "Frontend Shows 'Loading...'"
-This was a known issue resolved in v1.2.0. If it reoccurs:
-```bash
-# Check if stats are hardcoded correctly
-grep -n "282,388" src/frontend/src/pages/index.tsx
-
-# Verify Next.js build
-cd src/frontend && npm run build
-
-# Check static generation
-ls -la .next/static/
-```
-
-#### "Jordi Not Responding"
-```bash
-# Check Claude API key
-echo $ANTHROPIC_API_KEY
-
-# Test chat endpoint
-curl -X POST localhost:3001/api/chat \
-  -H "Content-Type: application/json" \
-  -d '{"message":"test"}'
-
-# Check backend logs
-railway logs --tail
-```
-
-#### "Railway Deployment Stuck"
-```bash
-# Force redeploy
-railway up --force
-
-# Check build logs
-railway logs --build
-
-# Verify Docker configuration
-docker build -t storymine-test .
-```
-
-### Performance Issues
-
-#### Slow Database Queries
-```bash
-# Run performance tests
-node scripts/test_database_operations.js --verbose
-
-# Check query performance
-# Enable PostgreSQL slow query logging
-# Analyze with EXPLAIN ANALYZE
-```
-
-#### High Memory Usage
-```bash
-# Monitor Railway metrics
-railway status
-
-# Check for memory leaks in Node.js
-# Add --inspect flag to server startup
-```
-
-### Recovery Procedures
-
-#### Database Connection Lost
-The system automatically retries database connections. Monitor with:
-```bash
-node scripts/monitor_database_connectivity.js --verbose
-```
-
-#### Complete System Failure
-1. Check Railway service status
-2. Review recent deployment logs
-3. Rollback if necessary: `railway rollback`
-4. Contact StoryMap Intelligence team for database issues
-
-## 📈 Performance Optimization
-
-### Database Optimization
-- **Indexing Strategy**: Optimized indexes on frequently queried columns
-- **Query Optimization**: Efficient JOINs and WHERE clauses
-- **Connection Pooling**: Reuses database connections
-- **Query Caching**: Frequently requested data cached in memory
-
-### Frontend Optimization  
-- **Static Generation**: Next.js pre-builds pages for fastest loading
-- **Image Optimization**: Automatic image compression and lazy loading
-- **Code Splitting**: JavaScript bundles split for faster initial load
-- **CDN Integration**: Static assets served via Railway's global CDN
-
-### Backend Optimization
-- **Async Operations**: Non-blocking I/O for all database operations
-- **Memory Management**: Efficient data structures and garbage collection
-- **Compression**: Response compression for faster data transfer
-- **Error Recovery**: Graceful degradation and automatic retry logic
-
-## 🔄 Deployment Process
-
-### Development Workflow
-1. **Local Development**: Test changes locally with development database
-2. **Testing**: Run comprehensive test suite
-3. **Code Review**: Peer review of all changes
-4. **Staging**: Deploy to staging environment (if available)
-5. **Production**: Deploy to Railway with monitoring
-
-### Deployment Steps
-```bash
-# 1. Prepare deployment
-git add .
-git commit -m "Description of changes"
-
-# 2. Run tests
-node scripts/test_database_operations.js
-
-# 3. Deploy to Railway
-railway up
-
-# 4. Monitor deployment
-railway logs --tail
-
-# 5. Verify functionality
-curl https://storymine-production.up.railway.app/api/health
-```
-
-### Rollback Process
-```bash
-# If deployment fails
-railway rollback
-
-# Or deploy previous version
-git revert HEAD
-railway up
-```
-
-## 📞 Support & Maintenance
-
-### Team Contacts
-- **Development Team**: [Your team contact]
-- **StoryMap Intelligence Team**: [Database team contact]
-- **Railway Support**: [Railway support if needed]
-
-### Maintenance Schedule
-- **Database Monitoring**: Continuous (24/7)
-- **Performance Testing**: Weekly
-- **Security Updates**: As needed
-- **Feature Updates**: Monthly releases
-
-### Emergency Procedures
-1. **Database Outage**: Contact StoryMap Intelligence team immediately
-2. **Railway Service Issues**: Check Railway status page, contact support
-3. **Security Incidents**: Immediate response protocol, log review
-4. **Data Corruption**: Database backup restoration procedures
-
-## 📚 Additional Resources
-
-### Documentation
-- **API Documentation**: `/docs/api/` (when available)
-- **Database Schema**: `/docs/database/`
-- **Deployment Guide**: `/docs/deployment/`
-
-### External Links
-- [Next.js Documentation](https://nextjs.org/docs)
-- [Railway Documentation](https://docs.railway.app)
-- [PostgreSQL Documentation](https://www.postgresql.org/docs)
-- [Anthropic Claude API](https://docs.anthropic.com)
-
-### Monitoring Dashboards
-- **Railway Metrics**: Railway dashboard
-- **Database Health**: `logs/database_health_report.json`
-- **Application Logs**: `railway logs`
+### Key Features Implemented ✅
+- **Intelligence service**: Complete with smart database queries and fallback systems
+- **Enhanced filtering**: Categories + year ranges with visual interface
+- **Two-tier discovery**: Dashboard + conversation interfaces
+- **Documentary scoring**: Visual potential ratings and intelligence integration
+- **Production deployment**: Railway-ready with health monitoring
+- **Comprehensive documentation**: Technical details and development insights
 
 ---
 
-**StoryMine v1.2.0** - Built for documentary story discovery and historical narrative analysis.
+**System Version**: StoryMine v3.0.0  
+**Intelligence Data**: StoryMap Intelligence Team (282,388 articles)  
+**Last Updated**: June 8, 2025 - Complete Jordi Intelligence System implementation
 
-For technical support or questions about this documentation, contact the development team. 
+*StoryMine transforms historical archives into actionable documentary opportunities through intelligent discovery, enhanced filtering, and contextual conversation powered by Jordi.* 

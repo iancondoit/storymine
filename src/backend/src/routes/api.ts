@@ -13,6 +13,7 @@ import { handleChatMessage } from '../controllers/chatController';
 import { getStoryMapStats } from '../controllers/storyMapController';
 import { claudeService } from '../services/claudeService';
 import databaseRouter from './database';
+import narrativeRouter from './narrativeRoutes';
 import { query } from '../database/connection';
 
 export const router = express.Router();
@@ -24,6 +25,9 @@ router.get('/health', (_req: Request, res: Response) => {
 
 // Database endpoints
 router.use('/database', databaseRouter);
+
+// Jordi Intelligence endpoints
+router.use('/narrative', narrativeRouter);
 
 // StoryMap status endpoint
 router.get('/storymap-stats', getStoryMapStats);
