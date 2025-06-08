@@ -1,0 +1,35 @@
+{
+  "name": "storymine",
+  "version": "1.2.0",
+  "description": "Web application for exploring historical news archives with Jordi",
+  "scripts": {
+    "backend:dev": "cd backend && npm run dev",
+    "frontend:dev": "cd frontend && npm run dev",
+    "dev": "concurrently \"npm run backend:dev\" \"npm run frontend:dev\"",
+    "docker:up": "docker-compose up --build",
+    "docker:down": "docker-compose down",
+    "backend:build": "cd backend && npm run build",
+    "frontend:build": "cd frontend && npm run build",
+    "build": "npm run backend:build && npm run frontend:build",
+    "backend:test": "cd backend && npm test",
+    "frontend:test": "cd frontend && npm test",
+    "test": "npm run backend:test && npm run frontend:test"
+  },
+  "keywords": [
+    "news",
+    "history",
+    "archives",
+    "chatbot",
+    "AI",
+    "media"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "axios": "^1.9.0",
+    "dotenv": "^16.5.0"
+  }
+}

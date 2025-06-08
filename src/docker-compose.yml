@@ -1,0 +1,86 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      - PORT=3001
+      - NODE_ENV=development
+      - API_ENVIRONMENT=development
+      # StoryMap API configuration - Docker is the only supported method
+      - AUTH_METHOD=none
+      # Use host.docker.internal as primary connection method for Docker
+      - STORYMAP_API_URLS=http://host.docker.internal:8080,http://localhost:8080
+      # Retry configuration
+      - MAX_RETRIES=3
+      - RETRY_DELAY=2000
+      # Default pagination settings for large datasets
+      - DEFAULT_PAGE_SIZE=20
+      - MAX_PAGE_SIZE=100
+      # Cache settings
+      - CACHE_ENABLED=true
+      - REDIS_URL=redis://redis:6379
+      - CACHE_TTL=300
+      # Performance settings
+      - API_TIMEOUT=15000
+      - MAX_CONNECTIONS=100
+      # Rate limiting
+      - RATE_LIMIT=60
+      - TOKEN_EXPIRY=86400
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    command: npm run dev
+    restart: unless-stopped
+    depends_on:
+      - redis
+    extra_hosts:
+      # For Linux hosts, ensure host.docker.internal works
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:3001/api
+    ports:
+      - "3002:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      backend:
+        condition: service_healthy
+    command: npm run dev
+    restart: unless-stopped
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  redis-data:
+
+networks:
+  default:
+    driver: bridge 

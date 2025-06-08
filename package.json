@@ -1,0 +1,76 @@
+{
+  "name": "storymine",
+  "version": "3.0.0",
+  "description": "Historical research platform with StoryMap Intelligence integration for discovering lost stories with documentary potential",
+  "scripts": {
+    "backend:dev": "cd src/backend && npm run dev",
+    "frontend:dev": "cd src/frontend && npm run dev",
+    "dev": "concurrently \"npm run backend:dev\" \"npm run frontend:dev\"",
+    "docker:up": "docker-compose up --build",
+    "docker:down": "docker-compose down",
+    "backend:build": "cd src/backend && npm run build",
+    "frontend:build": "cd src/frontend && npm run build",
+    "build": "npm run backend:build && npm run frontend:build",
+    "backend:test": "cd src/backend && npm test",
+    "frontend:test": "cd src/frontend && npm test",
+    "test": "npm run backend:test && npm run frontend:test",
+    "import:intelligence": "cd src/backend && node scripts/importIntelligenceData.js",
+    "deploy:railway": "./scripts/deploy-railway.sh",
+    "health:check": "curl -f http://localhost:3001/health && curl -f http://localhost:3000",
+    "logs:backend": "docker-compose logs -f backend",
+    "logs:frontend": "docker-compose logs -f frontend",
+    "clean:docker": "docker-compose down -v && docker system prune -f",
+    "start:production": "NODE_ENV=production npm run docker:up",
+    "start": "cd src/backend && npm start",
+    "deploy": "railway up",
+    "logs": "railway logs --tail",
+    "status": "railway status",
+    "monitor": "node scripts/monitor_database_connectivity.js --verbose",
+    "monitor:continuous": "node scripts/monitor_database_connectivity.js --verbose --interval=30",
+    "test:database": "node scripts/test_database_operations.js --verbose",
+    "test:quick": "node scripts/test_database_operations.js",
+    "diagnostics": "node scripts/run_all_diagnostics.js",
+    "diagnostics:verbose": "node scripts/run_all_diagnostics.js --verbose",
+    "diagnostics:continuous": "node scripts/run_all_diagnostics.js --continuous",
+    "health": "node scripts/run_all_diagnostics.js && echo '✅ System Health Check Complete'",
+    "install:all": "npm install && cd src/backend && npm install && cd ../frontend && npm install",
+    "clean": "rm -rf node_modules src/backend/node_modules src/frontend/node_modules logs/*.log",
+    "setup": "npm run install:all && mkdir -p logs"
+  },
+  "keywords": [
+    "historical-research",
+    "documentary",
+    "ai-assistant",
+    "newspaper-archives",
+    "narrative-archaeology",
+    "storymap-intelligence",
+    "jordi",
+    "postgresql",
+    "nextjs",
+    "railway"
+  ],
+  "author": "StoryMine Team",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.24.3",
+    "axios": "^1.9.0",
+    "dotenv": "^16.5.0",
+    "pg": "^8.16.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/storymine.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-org/storymine/issues"
+  },
+  "homepage": "https://github.com/your-org/storymine#readme"
+}

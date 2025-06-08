@@ -1,0 +1,42 @@
+# Intelligence Data Import Task Dockerfile
+# Optimized for running in AWS ECS Fargate for scheduled data imports
+
+FROM node:18-alpine
+
+# Install system dependencies for data processing
+RUN apk add --no-cache \
+    curl \
+    bash \
+    postgresql-client \
+    python3 \
+    py3-pip \
+    aws-cli
+
+WORKDIR /app
+
+# Copy package files first for better caching
+COPY package*.json ./
+
+# Install Node.js dependencies
+RUN npm ci --only=production
+
+# Copy the backend source code
+COPY . .
+
+# Install additional dependencies for import task
+RUN npm install commander glob
+
+# Create directories for data processing
+RUN mkdir -p /data /tmp/storymine-processing
+
+# Set environment variables
+ENV NODE_ENV=production
+ENV IMPORT_MODE=aws
+ENV DATA_BATCH_SIZE=1000
+
+# Health check for ECS
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD node -e "console.log('Import task healthy')" || exit 1
+
+# Default command for import task
+CMD ["node", "scripts/importIntelligenceData.js", "--data-dir", "/data", "--verbose", "--quality-report"] 
