@@ -113,25 +113,244 @@ export class ClaudeNarrativeService {
     
     return {
       success: true,
-      stories: result.rows.map((article: any) => ({
-        id: article.storymap_id || `atlanta-story-${article.id}`,
-        title: article.title,
-        summary: article.content?.substring(0, 200) + '...',
-        year: new Date(article.publication_date).getFullYear(),
-        category: this.extractCategory(article.primary_themes, article.content),
-        documentaryPotential: Math.round((article.documentary_potential || 0) * 100),
-        narrativeScore: Math.round((article.narrative_score || 0) * 100),
-        archivalRichness: Math.round((article.archival_richness || 0) * 100),
-        evidenceQuality: Math.round((article.evidence_quality || 0) * 100),
-        themes: article.primary_themes || [],
-        publicationDate: article.publication_date
-      })),
+      stories: result.rows.map((article: any) => this.transformToDocumentaryStory(article)),
       metadata: {
         source: 'intelligence',
         category,
         yearRange,
         totalFound: result.rows.length
       }
+    };
+  }
+
+  /**
+   * TRANSFORM RAW ARTICLE TO DOCUMENTARY STORY
+   * Apply Jordi Intelligence principles for compelling narrative creation
+   */
+  private transformToDocumentaryStory(article: any): any {
+    const year = new Date(article.publication_date).getFullYear();
+    const content = article.content || '';
+    const title = article.title || 'Untitled Story';
+    
+    // Generate documentary-focused summary using AI analysis principles
+    const documentarySummary = this.generateDocumentarySummary(article);
+    
+    // Extract compelling narrative elements
+    const storyElements = this.extractStoryElements(article);
+    
+    // Calculate composite documentary score
+    const documentaryScore = this.calculateDocumentaryScore(article);
+    
+    return {
+      id: article.storymap_id || `atlanta-story-${article.id}`,
+      title: this.enhanceTitle(title, storyElements),
+      summary: documentarySummary,
+      year: year,
+      category: this.extractCategory(article.primary_themes, content),
+      documentaryPotential: documentaryScore.potential,
+      narrativeScore: documentaryScore.narrative,
+      archivalRichness: Math.round((article.archival_richness || 0.5) * 100),
+      evidenceQuality: Math.round((article.evidence_quality || 0.6) * 100),
+      themes: this.extractThematicElements(content, article.primary_themes),
+      storyElements: storyElements,
+      publicationDate: article.publication_date,
+      historicalContext: this.getHistoricalContext(year),
+      documentaryViability: this.assessDocumentaryViability(article)
+    };
+  }
+
+  /**
+   * GENERATE DOCUMENTARY-FOCUSED SUMMARY
+   * Create compelling narrative descriptions that highlight documentary potential
+   */
+  private generateDocumentarySummary(article: any): string {
+    const content = article.content || '';
+    const title = article.title || '';
+    const year = new Date(article.publication_date).getFullYear();
+    
+    // Extract key elements for documentary storytelling
+    const characters = this.extractCharacters(content);
+    const conflict = this.extractConflict(content);
+    const stakes = this.extractStakes(content, year);
+    const visualElements = this.identifyVisualElements(content, title);
+    
+    // Build documentary-style summary
+    let summary = '';
+    
+    if (characters.length > 0 && conflict) {
+      summary = `${characters[0]} ${conflict.toLowerCase()}, revealing ${stakes}. `;
+    } else if (conflict) {
+      summary = `A compelling story of ${conflict.toLowerCase()} that exposes ${stakes}. `;
+    } else {
+      // Fallback to enhanced content extraction
+      const firstSentence = content.split('.')[0] || title;
+      summary = `${firstSentence}${firstSentence.endsWith('.') ? '' : '.'} `;
+    }
+    
+    // Add historical context and documentary angle
+    const context = this.getHistoricalContext(year);
+    if (context.significance) {
+      summary += `Set against the backdrop of ${context.significance.toLowerCase()}, `;
+    }
+    
+    // Add documentary potential hook
+    if (visualElements.length > 0) {
+      summary += `this story offers rich archival potential with ${visualElements.join(', ')}.`;
+    } else {
+      summary += `this narrative provides a compelling window into a pivotal moment in Atlanta's history.`;
+    }
+    
+    return summary.length > 400 ? summary.substring(0, 400) + '...' : summary;
+  }
+
+  /**
+   * EXTRACT STORY ELEMENTS FOR DOCUMENTARY ANALYSIS
+   */
+  private extractStoryElements(article: any): any {
+    const content = article.content || '';
+    
+    return {
+      characters: this.extractCharacters(content),
+      conflict: this.extractConflict(content),
+      setting: this.extractSetting(content),
+      stakes: this.extractStakes(content, new Date(article.publication_date).getFullYear()),
+      visualElements: this.identifyVisualElements(content, article.title),
+      archivalPotential: this.assessArchivalPotential(content)
+    };
+  }
+
+  /**
+   * EXTRACT COMPELLING CHARACTERS FROM CONTENT
+   */
+  private extractCharacters(content: string): string[] {
+    const characters: string[] = [];
+    
+    // Look for proper names and titles
+    const namePatterns = [
+      /([A-Z][a-z]+ [A-Z][a-z]+(?:,? (?:Jr|Sr|III))?)(?:\s+of\s+[A-Z][a-z]+)?/g,
+      /(?:Mr|Mrs|Miss|Dr|Judge|Mayor|Commissioner|Chief|Captain|Colonel)\s+([A-Z][a-z]+)/g,
+      /([A-Z][a-z]+),?\s+(?:age|aged)\s+\d+/g
+    ];
+    
+    namePatterns.forEach(pattern => {
+      const matches = content.match(pattern);
+      if (matches) {
+        matches.forEach(match => {
+          const cleanName = match.replace(/,?\s+age\d?\s+\d+/, '').trim();
+          if (cleanName.length > 3 && !characters.includes(cleanName)) {
+            characters.push(cleanName);
+          }
+        });
+      }
+    });
+    
+    return characters.slice(0, 3); // Top 3 most prominent characters
+  }
+
+  /**
+   * EXTRACT CENTRAL CONFLICT/TENSION
+   */
+  private extractConflict(content: string): string {
+    const conflictKeywords = [
+      { pattern: /accuse[ds]?|charge[ds]?|arrest/i, conflict: 'faces serious accusations' },
+      { pattern: /murder|kill|death|die[ds]?/i, conflict: 'confronts tragic circumstances' },
+      { pattern: /strike|protest|demonstrate/i, conflict: 'leads resistance efforts' },
+      { pattern: /trial|court|jury|judge/i, conflict: 'battles in the courtroom' },
+      { pattern: /fire|disaster|accident/i, conflict: 'overcomes devastating challenges' },
+      { pattern: /controversy|scandal|expose/i, conflict: 'uncovers shocking revelations' },
+      { pattern: /reform|change|revolution/i, conflict: 'fights for social transformation' }
+    ];
+    
+    for (const item of conflictKeywords) {
+      if (item.pattern.test(content)) {
+        return item.conflict;
+      }
+    }
+    
+    // Generic conflict if no specific pattern found
+    if (content.toLowerCase().includes('against')) {
+      return 'struggles against the odds';
+    }
+    
+    return 'navigates complex circumstances';
+  }
+
+  /**
+   * EXTRACT STORY STAKES AND SIGNIFICANCE
+   */
+  private extractStakes(content: string, year: number): string {
+    const stakes = [];
+    
+    if (content.match(/\$[\d,]+|\d+\s+dollar/i)) stakes.push('significant financial implications');
+    if (content.match(/lives?|death|survival/i)) stakes.push('matters of life and death');
+    if (content.match(/justice|rights|freedom/i)) stakes.push('fundamental questions of justice');
+    if (content.match(/community|neighborhood|city/i)) stakes.push('the future of the community');
+    if (content.match(/family|children|home/i)) stakes.push('family stability and security');
+    
+    // Add historical context stakes
+    if (year >= 1929 && year <= 1939) stakes.push('economic survival during the Depression');
+    if (year >= 1941 && year <= 1945) stakes.push('wartime challenges on the home front');
+    if (year >= 1954 && year <= 1961) stakes.push('racial integration and civil rights');
+    
+    return stakes.length > 0 ? stakes[0] : 'the stakes of human dignity and perseverance';
+  }
+
+  /**
+   * IDENTIFY VISUAL/ARCHIVAL ELEMENTS FOR DOCUMENTARY
+   */
+  private identifyVisualElements(content: string, title: string): string[] {
+    const elements: string[] = [];
+    const text = (content + ' ' + title).toLowerCase();
+    
+    if (text.match(/photograph|picture|image/)) elements.push('period photographs');
+    if (text.match(/court|trial|legal/)) elements.push('court records');
+    if (text.match(/newspaper|headline|reporter/)) elements.push('newspaper archives');
+    if (text.match(/building|street|downtown|location/)) elements.push('historic locations');
+    if (text.match(/letter|document|record/)) elements.push('primary documents');
+    if (text.match(/speech|address|statement/)) elements.push('recorded testimonies');
+    if (text.match(/crowd|gathering|event/)) elements.push('crowd scenes');
+    
+    return elements;
+  }
+
+  /**
+   * CALCULATE ENHANCED DOCUMENTARY SCORE
+   */
+  private calculateDocumentaryScore(article: any): { potential: number, narrative: number } {
+    const baseScore = {
+      potential: Math.round((article.documentary_potential || 0.3) * 100),
+      narrative: Math.round((article.narrative_score || 0.4) * 100)
+    };
+    
+    // Apply intelligence-based scoring enhancements
+    const content = article.content || '';
+    let potentialBonus = 0;
+    let narrativeBonus = 0;
+    
+    // Character-driven stories get bonus points
+    const characters = this.extractCharacters(content);
+    if (characters.length >= 2) potentialBonus += 15;
+    if (characters.length >= 1) narrativeBonus += 10;
+    
+    // Visual/archival richness bonus
+    const visualElements = this.identifyVisualElements(content, article.title);
+    potentialBonus += Math.min(visualElements.length * 8, 25);
+    
+    // High-stakes stories get narrative bonus
+    if (content.match(/murder|death|trial|crisis|disaster/i)) {
+      narrativeBonus += 20;
+      potentialBonus += 10;
+    }
+    
+    // Historical significance bonus
+    const year = new Date(article.publication_date).getFullYear();
+    if (year >= 1929 && year <= 1933) potentialBonus += 10; // Depression onset
+    if (year >= 1941 && year <= 1945) potentialBonus += 15; // WWII
+    if (year >= 1954 && year <= 1961) potentialBonus += 20; // Civil Rights era
+    
+    return {
+      potential: Math.min(baseScore.potential + potentialBonus, 100),
+      narrative: Math.min(baseScore.narrative + narrativeBonus, 100)
     };
   }
 
@@ -320,10 +539,37 @@ export class ClaudeNarrativeService {
 
   // Helper methods
   private extractCategory(themes: string[], content: string): string {
-    if (themes?.includes('Politics')) return 'Politics';
-    if (themes?.includes('Crime')) return 'Crime';
-    if (themes?.includes('War')) return 'War';
-    if (themes?.includes('Women')) return 'Women\'s Stories';
+    if (themes && themes.length > 0) {
+      // Map themes to display categories
+      const themeMap: Record<string, string> = {
+        'Politics': 'Politics',
+        'Crime': 'Crime & Justice', 
+        'War': 'War & Military',
+        'Business': 'Business',
+        'Sports': 'Sports',
+        'Women': 'Women\'s Stories',
+        'Social Reform': 'Protests & Reform',
+        'Education': 'Education',
+        'Entertainment': 'Entertainment'
+      };
+      
+      for (const theme of themes) {
+        if (themeMap[theme]) return themeMap[theme];
+      }
+    }
+    
+    // Fallback to content analysis
+    const text = content.toLowerCase();
+    if (text.includes('politic') || text.includes('election')) return 'Politics';
+    if (text.includes('crime') || text.includes('murder') || text.includes('trial')) return 'Crime & Justice';
+    if (text.includes('war') || text.includes('military')) return 'War & Military';
+    if (text.includes('business') || text.includes('economic')) return 'Business';
+    if (text.includes('sport') || text.includes('baseball')) return 'Sports';
+    if (text.includes('women') || text.includes('ladies')) return 'Women\'s Stories';
+    if (text.includes('protest') || text.includes('strike')) return 'Protests & Reform';
+    if (text.includes('school') || text.includes('education')) return 'Education';
+    if (text.includes('theater') || text.includes('entertainment')) return 'Entertainment';
+    
     return 'General';
   }
 
@@ -369,5 +615,209 @@ export class ClaudeNarrativeService {
 
   async discoverStoryFrameworks(params: any): Promise<any> {
     return await this.getCuratedStoryOptions(params);
+  }
+
+  /**
+   * ENHANCE TITLE WITH DOCUMENTARY ELEMENTS
+   */
+  private enhanceTitle(originalTitle: string, storyElements: any): string {
+    // If title is already compelling, keep it
+    if (originalTitle.length > 20 && 
+        (originalTitle.includes(':') || originalTitle.match(/[A-Z][a-z]+ [A-Z][a-z]+/))) {
+      return originalTitle;
+    }
+    
+    // Enhance short or generic titles
+    const characters = storyElements.characters || [];
+    const conflict = storyElements.conflict || '';
+    
+    if (characters.length > 0 && conflict.includes('faces')) {
+      return `${characters[0]} Faces Justice: ${originalTitle}`;
+    } else if (characters.length > 0) {
+      return `The Story of ${characters[0]}: ${originalTitle}`;
+    } else if (conflict.includes('murder') || conflict.includes('death')) {
+      return `Murder in Atlanta: ${originalTitle}`;
+    } else if (conflict.includes('trial') || conflict.includes('court')) {
+      return `Courtroom Drama: ${originalTitle}`;
+    }
+    
+    return originalTitle;
+  }
+
+  /**
+   * EXTRACT THEMATIC ELEMENTS FOR DOCUMENTARY FOCUS
+   */
+  private extractThematicElements(content: string, primaryThemes?: string[]): string[] {
+    const themes = new Set<string>();
+    
+    // Add primary themes if available
+    if (primaryThemes) {
+      primaryThemes.forEach(theme => themes.add(theme));
+    }
+    
+    // Extract additional themes from content analysis
+    const text = content.toLowerCase();
+    
+    if (text.match(/justice|rights|fair|equal/)) themes.add('Justice');
+    if (text.match(/family|children|home|mother|father/)) themes.add('Family');
+    if (text.match(/community|neighbor|together|unity/)) themes.add('Community');
+    if (text.match(/struggle|fight|battle|overcome/)) themes.add('Perseverance');
+    if (text.match(/change|transform|progress|reform/)) themes.add('Social Change');
+    if (text.match(/courage|brave|hero|stand/)) themes.add('Courage');
+    if (text.match(/tragedy|loss|grief|sorrow/)) themes.add('Human Tragedy');
+    if (text.match(/triumph|victory|success|achieve/)) themes.add('Triumph');
+    
+    return Array.from(themes);
+  }
+
+  /**
+   * GET HISTORICAL CONTEXT FOR DOCUMENTARY FRAMING
+   */
+  private getHistoricalContext(year: number): any {
+    const contexts: Record<string, any> = {
+      '1920s': {
+        period: '1920s',
+        significance: 'the Roaring Twenties and post-WWI transformation',
+        events: ['Prohibition', 'Women\'s Suffrage', 'Economic Prosperity'],
+        documentaryAngle: 'social and cultural revolution'
+      },
+      '1930s': {
+        period: '1930s', 
+        significance: 'the Great Depression and New Deal era',
+        events: ['Stock Market Crash', 'New Deal Programs', 'Dust Bowl'],
+        documentaryAngle: 'economic hardship and resilience'
+      },
+      '1940s': {
+        period: '1940s',
+        significance: 'World War II and post-war adjustment',
+        events: ['WWII Home Front', 'Victory Gardens', 'Veterans Return'],
+        documentaryAngle: 'wartime sacrifice and rebuilding'
+      },
+      '1950s': {
+        period: '1950s',
+        significance: 'post-war prosperity and social change',
+        events: ['Civil Rights Movement', 'Suburban Growth', 'Cold War'],
+        documentaryAngle: 'social transformation and racial tensions'
+      }
+    };
+    
+    if (year >= 1920 && year < 1930) return contexts['1920s'];
+    if (year >= 1930 && year < 1940) return contexts['1930s'];
+    if (year >= 1940 && year < 1950) return contexts['1940s'];
+    if (year >= 1950 && year <= 1961) return contexts['1950s'];
+    
+    return {
+      period: year.toString(),
+      significance: 'a pivotal moment in Atlanta history',
+      events: ['Social Change'],
+      documentaryAngle: 'historical significance'
+    };
+  }
+
+  /**
+   * ASSESS DOCUMENTARY VIABILITY
+   */
+  private assessDocumentaryViability(article: any): any {
+    const content = article.content || '';
+    const visualElements = this.identifyVisualElements(content, article.title);
+    const characters = this.extractCharacters(content);
+    
+    let viabilityScore = 50; // Base score
+    let recommendations = [];
+    
+    // Character-driven stories are more viable
+    if (characters.length >= 2) {
+      viabilityScore += 20;
+      recommendations.push('Strong character-driven narrative potential');
+    } else if (characters.length === 1) {
+      viabilityScore += 10;
+      recommendations.push('Single character focus - good for portrait documentary');
+    }
+    
+    // Visual/archival richness
+    if (visualElements.length >= 3) {
+      viabilityScore += 25;
+      recommendations.push('Rich archival materials available');
+    } else if (visualElements.length >= 1) {
+      viabilityScore += 15;
+      recommendations.push('Some archival materials identified');
+    }
+    
+    // High-stakes content
+    if (content.match(/murder|death|trial|crisis/i)) {
+      viabilityScore += 15;
+      recommendations.push('High-stakes drama appeals to audiences');
+    }
+    
+    // Historical significance
+    const year = new Date(article.publication_date).getFullYear();
+    if (year >= 1954 && year <= 1961) {
+      viabilityScore += 20;
+      recommendations.push('Civil Rights era relevance');
+    } else if (year >= 1929 && year <= 1939) {
+      viabilityScore += 15;
+      recommendations.push('Great Depression historical importance');
+    }
+    
+    return {
+      score: Math.min(viabilityScore, 100),
+      level: viabilityScore >= 80 ? 'High' : viabilityScore >= 60 ? 'Moderate' : 'Developing',
+      recommendations: recommendations
+    };
+  }
+
+  /**
+   * EXTRACT SETTING/LOCATION DETAILS
+   */
+  private extractSetting(content: string): string {
+    const locationPatterns = [
+      /(?:at|in|on)\s+([A-Z][a-z]+\s+(?:Street|Avenue|Road|Boulevard|Drive))/g,
+      /(?:downtown|uptown)\s+Atlanta/i,
+      /([A-Z][a-z]+)\s+(?:County|District|Area)/g,
+      /(?:at|in)\s+the\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/g
+    ];
+    
+    for (const pattern of locationPatterns) {
+      const matches = content.match(pattern);
+      if (matches && matches.length > 0) {
+        return matches[0].replace(/^(?:at|in|on)\s+/, '');
+      }
+    }
+    
+    // Default to Atlanta if no specific location found
+    return 'Atlanta, Georgia';
+  }
+
+  /**
+   * ASSESS ARCHIVAL POTENTIAL FOR DOCUMENTARY PRODUCTION  
+   */
+  private assessArchivalPotential(content: string): any {
+    const elements = this.identifyVisualElements(content, '');
+    const hasPhotos = content.match(/photograph|picture|image/i);
+    const hasDocuments = content.match(/document|record|letter|report/i);
+    const hasTestimony = content.match(/testimony|statement|interview|speech/i);
+    
+    let potential = 'Limited';
+    let score = 30;
+    
+    if (elements.length >= 3) {
+      potential = 'Excellent';
+      score = 90;
+    } else if (elements.length >= 2) {
+      potential = 'Good';  
+      score = 70;
+    } else if (elements.length >= 1) {
+      potential = 'Moderate';
+      score = 50;
+    }
+    
+    return {
+      level: potential,
+      score: score,
+      elements: elements,
+      hasPhotos: !!hasPhotos,
+      hasDocuments: !!hasDocuments,
+      hasTestimony: !!hasTestimony
+    };
   }
 } 
