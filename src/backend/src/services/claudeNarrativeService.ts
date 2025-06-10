@@ -184,7 +184,7 @@ export class ClaudeNarrativeService {
       const hasTitle = article.title && article.title.length > 10;
       const hasYear = article.year >= 1920 && article.year <= 1961;
       
-      // Quality control: Filter out bad titles
+      // Quality control: Filter out bad titles - simplified patterns
       const title = (article.title || '').toUpperCase();
       const isBadTitle = 
         title.includes('NEWSPAPER') ||
@@ -195,18 +195,15 @@ export class ClaudeNarrativeService {
         title.startsWith(')') ||
         title.includes('CONTINUES, IT WILL') ||
         title.length < 5 ||
-        title.match(/^[^A-Z]*$/) || // No actual letters
         title.includes('PAGE') ||
         title.includes('EDITION') ||
         title.includes('VOLUME') ||
         title.includes('MASTHEAD') ||
-        // Filter out bylines (author credits)
+        // Filter out bylines (author credits) - simplified
         title.startsWith('BY ') ||
         title.startsWith('FROM ') ||
-        title.match(/^[A-Z\.\s]+,\s*M\.\s*D\./) ||
-        title.match(/^[A-Z\.\s]+,\s*DR\./) ||
-        title.match(/^BY\s+[A-Z\.\s]+$/) ||
-        title.match(/^[A-Z]\.\s*[A-Z]\.\s+[A-Z]+$/) ||
+        title.includes(', M. D.') ||
+        title.includes(', DR.') ||
         // Filter out corrupted text
         title.includes('ISFVO') ||
         title.includes('CERTAINTY') ||
@@ -353,42 +350,45 @@ Return JSON (no other text):
   private optimizeTitle(title: string): string | null {
     if (!title) return null; // Return null for bad titles
     
-    const upper = title.toUpperCase();
-    
-    // Filter out newspaper mastheads and fragments
-    const isBadTitle = 
-      upper.includes('NEWSPAPER') ||
-      upper.includes('STANDARD') ||
-      upper.includes('DAILY') ||
-      upper.includes('CONSTITUTION') ||
-      upper.startsWith('OF ANY') ||
-      upper.startsWith(')') ||
-      upper.includes('CONTINUES, IT WILL') ||
-      title.length < 5 ||
-      upper.includes('PAGE') ||
-      upper.includes('EDITION') ||
-      upper.includes('VOLUME') ||
-      upper.includes('MASTHEAD') ||
-      // Filter out bylines (author credits)
-      upper.startsWith('BY ') ||
-      upper.startsWith('FROM ') ||
-      upper.match(/^[A-Z\.\s]+,\s*M\.\s*D\./) || // "WILLIAM BRADY, M. D."
-      upper.match(/^[A-Z\.\s]+,\s*DR\./) ||      // "JOHN SMITH, DR."
-      upper.match(/^BY\s+[A-Z\.\s]+$/) ||        // "BY F. M. WILLIAMS"
-      upper.match(/^[A-Z]\.\s*[A-Z]\.\s+[A-Z]+$/) || // "F. M. WILLIAMS"
-      // Filter out sentence fragments and corrupted text
-      upper.includes('ISFVO') ||
-      upper.includes('CERTAINTY') ||
-      upper.length > 100; // Suspiciously long titles
-    
-    if (isBadTitle) return null; // Signal to skip this story
-    
-    // Quick title improvements
-    const cleaned = title.replace(/^\w+:\s*/, '').trim();
-    if (cleaned.length < 15) {
-      return `The Story of ${cleaned}`;
+    try {
+      const upper = title.toUpperCase();
+      
+      // Filter out newspaper mastheads and fragments
+      const isBadTitle = 
+        upper.includes('NEWSPAPER') ||
+        upper.includes('STANDARD') ||
+        upper.includes('DAILY') ||
+        upper.includes('CONSTITUTION') ||
+        upper.startsWith('OF ANY') ||
+        upper.startsWith(')') ||
+        upper.includes('CONTINUES, IT WILL') ||
+        title.length < 5 ||
+        upper.includes('PAGE') ||
+        upper.includes('EDITION') ||
+        upper.includes('VOLUME') ||
+        upper.includes('MASTHEAD') ||
+        // Filter out bylines (author credits) - simplified patterns
+        upper.startsWith('BY ') ||
+        upper.startsWith('FROM ') ||
+        upper.includes(', M. D.') ||
+        upper.includes(', DR.') ||
+        // Filter out sentence fragments and corrupted text
+        upper.includes('ISFVO') ||
+        upper.includes('CERTAINTY') ||
+        upper.length > 100; // Suspiciously long titles
+      
+      if (isBadTitle) return null; // Signal to skip this story
+      
+      // Quick title improvements
+      const cleaned = title.replace(/^\w+:\s*/, '').trim();
+      if (cleaned.length < 15) {
+        return `The Story of ${cleaned}`;
+      }
+      return cleaned;
+    } catch (error) {
+      console.error('Error in optimizeTitle:', error);
+      return null; // Skip problematic titles
     }
-    return cleaned;
   }
 
   private generateQuickSummary(article: any): string {
