@@ -326,46 +326,47 @@ const JordiDashboard: React.FC = () => {
                   </div>
                 )}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="space-y-4">
                   {stories.map((story) => (
                     <div
                       key={story.id}
                       onClick={() => openStory(story.id)}
                       className="bg-white dark:bg-dark-800 border border-dark-200 dark:border-dark-700 rounded-lg p-6 cursor-pointer hover:border-accent-300 dark:hover:border-accent-600 transition-all duration-200 hover:shadow-lg dark:hover:shadow-dark-900/50"
                     >
-                      <div className="flex items-start justify-between mb-3">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getDocumentaryColor(story.documentaryPotential)}`}>
-                          {story.documentaryPotential}% potential
-                        </span>
-                        <span className="text-sm text-dark-500 dark:text-dark-400">{story.year}</span>
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-center space-x-3">
+                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getDocumentaryColor(story.documentaryPotential)}`}>
+                            {story.documentaryPotential}% potential
+                          </span>
+                          <span className="text-sm text-dark-500 dark:text-dark-400 font-mono">{story.year}</span>
+                          <span className="text-sm text-dark-500 dark:text-dark-400 capitalize">
+                            {getCategoryIcon(story.category)} {story.category}
+                          </span>
+                        </div>
+                        {story.narrativeScore && (
+                          <span className="text-sm text-accent-600 dark:text-accent-400 font-medium">
+                            {story.narrativeScore}% narrative
+                          </span>
+                        )}
                       </div>
                       
-                      <h3 className="text-lg font-semibold text-dark-900 dark:text-white mb-2 line-clamp-2">
+                      <h3 className="text-xl font-display font-bold text-dark-900 dark:text-white mb-3 leading-tight">
                         {story.title}
                       </h3>
                       
-                      <p className="text-dark-600 dark:text-dark-300 text-sm line-clamp-3 mb-4">
+                      <p className="text-dark-600 dark:text-dark-300 text-base leading-relaxed mb-4">
                         {story.summary}
                       </p>
                       
-                      <div className="flex flex-wrap gap-1 mb-3">
-                        {story.themes?.slice(0, 3).map((theme, index) => (
+                      <div className="flex flex-wrap gap-2">
+                        {story.themes?.slice(0, 4).map((theme, index) => (
                           <span
                             key={index}
-                            className="inline-flex items-center px-2 py-1 rounded text-xs bg-dark-100 dark:bg-dark-700 text-dark-700 dark:text-dark-300"
+                            className="inline-flex items-center px-3 py-1 rounded-md text-sm bg-dark-100 dark:bg-dark-700 text-dark-700 dark:text-dark-300 border border-dark-200 dark:border-dark-600"
                           >
                             {theme}
                           </span>
                         ))}
-                      </div>
-                      
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-dark-500 dark:text-dark-400 capitalize">{story.category}</span>
-                        {story.narrativeScore && (
-                          <span className="text-accent-600 dark:text-accent-400 font-medium">
-                            {story.narrativeScore}% narrative
-                          </span>
-                        )}
                       </div>
                     </div>
                   ))}
