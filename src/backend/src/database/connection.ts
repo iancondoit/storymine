@@ -1,5 +1,5 @@
 import { Pool, PoolClient } from 'pg';
-import dotenv from 'dotenv';
+import * as dotenv from 'dotenv';
 import { createTables } from './setup';
 
 dotenv.config();

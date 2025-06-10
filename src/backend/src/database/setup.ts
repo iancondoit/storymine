@@ -4,8 +4,9 @@
  */
 
 import { query } from './connection';
-import fs from 'fs';
-import path from 'path';
+import { Pool } from 'pg';
+import * as fs from 'fs';
+import * as path from 'path';
 
 /**
  * Create database tables if they don't exist
