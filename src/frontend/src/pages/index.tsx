@@ -274,7 +274,7 @@ export default function Home() {
                     
                     <div className="mt-8 flex justify-center">
                       <Link 
-                        href="/chat" 
+                        href="/jordi" 
                         className="btn-primary py-3 px-8 text-base"
                       >
                         Start Exploring with Jordi

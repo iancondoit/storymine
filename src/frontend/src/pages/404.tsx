@@ -61,7 +61,7 @@ export default function NotFound() {
                 <span>Return to Home</span>
               </Link>
               
-              <Link href="/chat" className="btn-secondary flex items-center justify-center gap-2">
+              <Link href="/jordi" className="btn-secondary flex items-center justify-center gap-2">
                 <Search size={16} />
                 <span>Search Archive</span>
               </Link>
