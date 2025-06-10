@@ -69,45 +69,67 @@ app.get('/health', (req, res) => {
 
 // Serve frontend for all other routes (SPA fallback)
 app.get('*', (req, res) => {
-  const indexPath = path.join(frontendPath, '.next/server/pages/index.html');
-  if (fs.existsSync(indexPath)) {
-    res.sendFile(indexPath);
+  const requestPath = req.path;
+  let htmlFile = 'index.html';
+  
+  // Map specific routes to their corresponding HTML files
+  if (requestPath === '/jordi') {
+    htmlFile = 'jordi.html';
+  } else if (requestPath === '/chat') {
+    htmlFile = 'chat.html';
+  } else if (requestPath === '/404') {
+    htmlFile = '404.html';
+  } else if (requestPath.startsWith('/jordi/story/')) {
+    // Dynamic route for story pages
+    htmlFile = 'jordi/story/[storyId].html';
+  }
+  
+  const targetPath = path.join(frontendPath, '.next/server/pages', htmlFile);
+  
+  if (fs.existsSync(targetPath)) {
+    res.sendFile(targetPath);
   } else {
-    // Fallback to a simple response if frontend files aren't available
-    const dbStatus = isDatabaseConnected() ? 
-      'Database: ✅ Connected' : 
-      'Database: ⚠️  Retrying connection...';
-      
-    res.status(200).send(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>StoryMine - Historical Research Platform</title>
-          <style>
-            body { font-family: Arial, sans-serif; margin: 40px; background: #1a1a1a; color: #fff; }
-            .container { max-width: 600px; margin: 0 auto; text-align: center; }
-            .logo { font-size: 2em; margin-bottom: 20px; color: #9d4edd; }
-            .status { background: #2a2a2a; padding: 20px; border-radius: 8px; margin: 20px 0; }
-            .api-link { color: #9d4edd; text-decoration: none; }
-            .api-link:hover { text-decoration: underline; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="logo">🧬 StoryMine</div>
-            <h1>Historical Research Platform</h1>
-            <div class="status">
-              <h3>✅ Backend API is Running</h3>
-              <p>The StoryMine backend is successfully deployed and operational.</p>
-              <p>${dbStatus}</p>
-              <p>API Health: <a href="/api/health" class="api-link">/api/health</a></p>
-              <p>Database Stats: <a href="/api/database/stats" class="api-link">/api/database/stats</a></p>
+    // Try default index.html
+    const indexPath = path.join(frontendPath, '.next/server/pages/index.html');
+    if (fs.existsSync(indexPath)) {
+      res.sendFile(indexPath);
+    } else {
+      // Fallback to a simple response if frontend files aren't available
+      const dbStatus = isDatabaseConnected() ? 
+        'Database: ✅ Connected' : 
+        'Database: ⚠️  Retrying connection...';
+        
+      res.status(200).send(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>StoryMine - Historical Research Platform</title>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 40px; background: #1a1a1a; color: #fff; }
+              .container { max-width: 600px; margin: 0 auto; text-align: center; }
+              .logo { font-size: 2em; margin-bottom: 20px; color: #9d4edd; }
+              .status { background: #2a2a2a; padding: 20px; border-radius: 8px; margin: 20px 0; }
+              .api-link { color: #9d4edd; text-decoration: none; }
+              .api-link:hover { text-decoration: underline; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="logo">🧬 StoryMine</div>
+              <h1>Historical Research Platform</h1>
+              <div class="status">
+                <h3>✅ Backend API is Running</h3>
+                <p>The StoryMine backend is successfully deployed and operational.</p>
+                <p>${dbStatus}</p>
+                <p>API Health: <a href="/api/health" class="api-link">/api/health</a></p>
+                <p>Database Stats: <a href="/api/database/stats" class="api-link">/api/database/stats</a></p>
+              </div>
+              <p><em>Ready for StoryMap Intelligence data import</em></p>
             </div>
-            <p><em>Ready for StoryMap Intelligence data import</em></p>
-          </div>
-        </body>
-      </html>
-    `);
+          </body>
+        </html>
+      `);
+    }
   }
 });
 
