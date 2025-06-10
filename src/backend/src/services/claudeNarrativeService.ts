@@ -199,7 +199,18 @@ export class ClaudeNarrativeService {
         title.includes('PAGE') ||
         title.includes('EDITION') ||
         title.includes('VOLUME') ||
-        title.includes('MASTHEAD');
+        title.includes('MASTHEAD') ||
+        // Filter out bylines (author credits)
+        title.startsWith('BY ') ||
+        title.startsWith('FROM ') ||
+        title.match(/^[A-Z\.\s]+,\s*M\.\s*D\./) ||
+        title.match(/^[A-Z\.\s]+,\s*DR\./) ||
+        title.match(/^BY\s+[A-Z\.\s]+$/) ||
+        title.match(/^[A-Z]\.\s*[A-Z]\.\s+[A-Z]+$/) ||
+        // Filter out corrupted text
+        title.includes('ISFVO') ||
+        title.includes('CERTAINTY') ||
+        title.length > 100;
       
       return hasGoodContent && hasTitle && hasYear && !isBadTitle;
     });
@@ -357,7 +368,18 @@ Return JSON (no other text):
       upper.includes('PAGE') ||
       upper.includes('EDITION') ||
       upper.includes('VOLUME') ||
-      upper.includes('MASTHEAD');
+      upper.includes('MASTHEAD') ||
+      // Filter out bylines (author credits)
+      upper.startsWith('BY ') ||
+      upper.startsWith('FROM ') ||
+      upper.match(/^[A-Z\.\s]+,\s*M\.\s*D\./) || // "WILLIAM BRADY, M. D."
+      upper.match(/^[A-Z\.\s]+,\s*DR\./) ||      // "JOHN SMITH, DR."
+      upper.match(/^BY\s+[A-Z\.\s]+$/) ||        // "BY F. M. WILLIAMS"
+      upper.match(/^[A-Z]\.\s*[A-Z]\.\s+[A-Z]+$/) || // "F. M. WILLIAMS"
+      // Filter out sentence fragments and corrupted text
+      upper.includes('ISFVO') ||
+      upper.includes('CERTAINTY') ||
+      upper.length > 100; // Suspiciously long titles
     
     if (isBadTitle) return null; // Signal to skip this story
     
