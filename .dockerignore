@@ -1,0 +1,97 @@
+# Node modules - will be installed during build
+node_modules/
+*/node_modules/
+src/*/node_modules/
+
+# Build artifacts
+dist/
+.next/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Development files
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
+.DS_Store
+Thumbs.db
+
+# Git and version control
+.git/
+.gitignore
+*.git*
+
+# Documentation and readme
+README.md
+CHANGELOG.md
+LICENSE
+*.md
+
+# Development and testing
+jest.config.js
+*.test.js
+*.test.ts
+*.spec.js
+*.spec.ts
+coverage/
+.nyc_output/
+
+# CI/CD and deployment
+.github/
+.railway/
+railway.json
+docker-compose.yml
+Dockerfile.dev
+
+# Cache directories
+.npm/
+.cache/
+.parcel-cache/
+.eslintcache
+
+# Logs and runtime
+logs/
+*.log
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Optional dependency directories
+jspm_packages/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# ESLint cache
+.eslintcache
+
+# Prettier
+.prettierrc*
+
+# Tailwind CSS
+tailwind.config.js
+
+# Next.js specific
+.next/
+out/
+
+# Legacy MultMind files (if any)
+legacy_multimind/
+
+# Documentation folders
+docs/
+
+# Scripts not needed in production
+scripts/dev*
+scripts/test* 
