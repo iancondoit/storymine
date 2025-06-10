@@ -178,12 +178,30 @@ export class ClaudeNarrativeService {
     console.log(`🎬 JORDI INTELLIGENCE: Starting optimized analysis for ${targetCount} stories`);
     console.log(`🎬 JORDI INTELLIGENCE: Analyzing ${articles.length} articles with smart filtering`);
     
-    // OPTIMIZATION 1: Pre-filter for high-potential articles
+    // OPTIMIZATION 1: Pre-filter for high-potential articles with quality control
     const highPotentialArticles = articles.filter(article => {
       const hasGoodContent = article.content_preview && article.content_preview.length > 300;
       const hasTitle = article.title && article.title.length > 10;
       const hasYear = article.year >= 1920 && article.year <= 1961;
-      return hasGoodContent && hasTitle && hasYear;
+      
+      // Quality control: Filter out bad titles
+      const title = (article.title || '').toUpperCase();
+      const isBadTitle = 
+        title.includes('NEWSPAPER') ||
+        title.includes('STANDARD') ||
+        title.includes('DAILY') ||
+        title.includes('CONSTITUTION') ||
+        title.startsWith('OF ANY') ||
+        title.startsWith(')') ||
+        title.includes('CONTINUES, IT WILL') ||
+        title.length < 5 ||
+        title.match(/^[^A-Z]*$/) || // No actual letters
+        title.includes('PAGE') ||
+        title.includes('EDITION') ||
+        title.includes('VOLUME') ||
+        title.includes('MASTHEAD');
+      
+      return hasGoodContent && hasTitle && hasYear && !isBadTitle;
     });
     
     console.log(`✨ Pre-filtered to ${highPotentialArticles.length} high-potential articles`);
@@ -199,18 +217,25 @@ export class ClaudeNarrativeService {
     
     if (existingIntelligence.length > 0) {
       console.log(`🚀 Fast-track: Found ${existingIntelligence.length} pre-analyzed articles`);
-      const fastTrackStories = existingIntelligence.slice(0, targetCount).map(article => ({
-        id: article.id,
-        title: this.optimizeTitle(article.title),
-        summary: this.generateQuickSummary(article),
-        year: article.year,
-        category: this.quickCategorize(article.title, category),
-        documentaryPotential: Math.round(article.documentary_potential * 100) || 85,
-        narrativeScore: Math.round(article.narrative_score * 100) || 80,
-        themes: this.extractQuickThemes(article.title, article.content_preview),
-        documentaryElements: this.generateQuickElements(article),
-        productionNotes: `Pre-analyzed high-potential story from ${article.year}`
-      }));
+      const fastTrackStories = existingIntelligence.slice(0, targetCount)
+        .map(article => {
+          const optimizedTitle = this.optimizeTitle(article.title);
+          if (!optimizedTitle) return null; // Skip bad articles
+          
+          return {
+            id: article.id,
+            title: optimizedTitle,
+            summary: this.generateQuickSummary(article),
+            year: article.year,
+            category: this.quickCategorize(article.title, category),
+            documentaryPotential: Math.round(article.documentary_potential * 100) || 85,
+            narrativeScore: Math.round(article.narrative_score * 100) || 80,
+            themes: this.extractQuickThemes(article.title, article.content_preview),
+            documentaryElements: this.generateQuickElements(article),
+            productionNotes: `Pre-analyzed high-potential story from ${article.year}`
+          };
+        })
+        .filter(story => story !== null); // Remove null entries
       
       if (fastTrackStories.length >= targetCount) {
         console.log(`⚡ Speed optimization: Returning ${fastTrackStories.length} pre-analyzed stories`);
@@ -312,14 +337,33 @@ Return JSON (no other text):
   }
 
   /**
-   * QUICK OPTIMIZATION HELPERS - Fast metadata generation
+   * QUICK OPTIMIZATION HELPERS - Fast metadata generation with quality control
    */
-  private optimizeTitle(title: string): string {
-    if (!title) return 'Untitled Atlanta Story';
+  private optimizeTitle(title: string): string | null {
+    if (!title) return null; // Return null for bad titles
+    
+    const upper = title.toUpperCase();
+    
+    // Filter out newspaper mastheads and fragments
+    const isBadTitle = 
+      upper.includes('NEWSPAPER') ||
+      upper.includes('STANDARD') ||
+      upper.includes('DAILY') ||
+      upper.includes('CONSTITUTION') ||
+      upper.startsWith('OF ANY') ||
+      upper.startsWith(')') ||
+      upper.includes('CONTINUES, IT WILL') ||
+      title.length < 5 ||
+      upper.includes('PAGE') ||
+      upper.includes('EDITION') ||
+      upper.includes('VOLUME') ||
+      upper.includes('MASTHEAD');
+    
+    if (isBadTitle) return null; // Signal to skip this story
     
     // Quick title improvements
     const cleaned = title.replace(/^\w+:\s*/, '').trim();
-    if (cleaned.length < 20) {
+    if (cleaned.length < 15) {
       return `The Story of ${cleaned}`;
     }
     return cleaned;
@@ -383,18 +427,25 @@ Return JSON (no other text):
   }
 
   private generateFallbackStories(articles: any[]): any[] {
-    return articles.map(article => ({
-      id: article.id,
-      title: this.optimizeTitle(article.title),
-      summary: this.generateQuickSummary(article),
-      year: article.year,
-      category: 'Historical Drama',
-      documentaryPotential: 75,
-      narrativeScore: 70,
-      themes: this.extractQuickThemes(article.title, article.content_preview),
-      documentaryElements: this.generateQuickElements(article),
-      productionNotes: `Fallback analysis from ${article.year}`
-    }));
+    return articles
+      .map(article => {
+        const optimizedTitle = this.optimizeTitle(article.title);
+        if (!optimizedTitle) return null; // Skip bad articles
+        
+        return {
+          id: article.id,
+          title: optimizedTitle,
+          summary: this.generateQuickSummary(article),
+          year: article.year,
+          category: 'Historical Drama',
+          documentaryPotential: 75,
+          narrativeScore: 70,
+          themes: this.extractQuickThemes(article.title, article.content_preview),
+          documentaryElements: this.generateQuickElements(article),
+          productionNotes: `Fallback analysis from ${article.year}`
+        };
+      })
+      .filter(story => story !== null); // Remove null entries
   }
 
   /**
