@@ -1,6 +1,6 @@
 {
   "name": "storymine",
-  "version": "3.0.0",
+  "version": "3.1.1",
   "description": "Historical research platform with StoryMap Intelligence integration for discovering lost stories with documentary potential",
   "scripts": {
     "backend:dev": "cd src/backend && npm run dev",
