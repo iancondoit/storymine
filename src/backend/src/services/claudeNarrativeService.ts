@@ -271,7 +271,7 @@ export class ClaudeNarrativeService {
    */
   private transformToDocumentaryStory(article: any): any {
     const year = new Date(article.publication_date).getFullYear();
-    const content = article.content || '';
+    const content = article.content || article.processed_content || '';
     const title = article.title || 'Untitled Story';
     
     // Generate documentary-focused summary using AI analysis principles
@@ -964,207 +964,253 @@ export class ClaudeNarrativeService {
   }
 
   /**
-   * GENERATE ENTITY-BASED STORIES: Create compelling stories from entity relationships
-   * This method generates the incredible documentary story ideas using the rich
-   * StoryMap Intelligence entity and relationship data
+   * ANALYZE CONFLICT AND DRAMA IN CONTENT
    */
-  private async generateEntityBasedStories(category: string, yearRange: string, count: number) {
-    console.log('🎭 Generating stories from entity relationships and dramatic tensions...');
+  private analyzeConflictAndDrama(content: string): { type: string, elements: string[] } {
+    const lowerContent = content.toLowerCase();
     
-    // Build entity query based on category and year range
-    let entityWhereClause = 'WHERE e.documentary_potential > 0.3';
-    let relationshipWhereClause = 'WHERE r.dramatic_tension > 0.4';
-    const params: any[] = [Math.min(count * 2, 100)]; // Get more entities than needed for variety
-
-    // Category-specific entity filtering
-    if (category !== 'general') {
-      const categoryEntityTypes: Record<string, string> = {
-        'politics': "e.entity_type IN ('person', 'organization') AND (e.canonical_name ILIKE '%governor%' OR e.canonical_name ILIKE '%mayor%' OR e.canonical_name ILIKE '%senator%' OR e.thematic_tags::text ILIKE '%politics%')",
-        'crime': "e.entity_type IN ('person', 'event') AND (e.thematic_tags::text ILIKE '%crime%' OR e.canonical_name ILIKE '%murder%' OR e.canonical_name ILIKE '%trial%')",
-        'war': "e.entity_type IN ('person', 'organization', 'event') AND (e.thematic_tags::text ILIKE '%war%' OR e.canonical_name ILIKE '%military%' OR e.canonical_name ILIKE '%battle%')",
-        'business': "e.entity_type IN ('person', 'organization') AND (e.thematic_tags::text ILIKE '%business%' OR e.canonical_name ILIKE '%company%' OR e.canonical_name ILIKE '%bank%')", 
-        'sports': "e.entity_type IN ('person', 'organization') AND (e.thematic_tags::text ILIKE '%sports%' OR e.canonical_name ILIKE '%baseball%' OR e.canonical_name ILIKE '%football%')",
-        'women': "e.entity_type IN ('person', 'organization') AND (e.canonical_name ILIKE '%women%' OR e.canonical_name ILIKE '%ladies%' OR e.thematic_tags::text ILIKE '%suffrage%')",
-        'protests': "e.entity_type IN ('person', 'organization', 'event') AND (e.thematic_tags::text ILIKE '%protest%' OR e.canonical_name ILIKE '%strike%' OR e.canonical_name ILIKE '%union%')",
-        'education': "e.entity_type IN ('person', 'organization') AND (e.canonical_name ILIKE '%school%' OR e.canonical_name ILIKE '%university%' OR e.canonical_name ILIKE '%college%')",
-        'entertainment': "e.entity_type IN ('person', 'organization') AND (e.thematic_tags::text ILIKE '%entertainment%' OR e.canonical_name ILIKE '%theater%' OR e.canonical_name ILIKE '%music%')"
-      };
-
-      if (categoryEntityTypes[category]) {
-        entityWhereClause += ` AND (${categoryEntityTypes[category]})`;
-      }
+    // Identify conflict types
+    let conflictType = 'personal';
+    const conflictElements: string[] = [];
+    
+    if (lowerContent.includes('murder') || lowerContent.includes('killed') || lowerContent.includes('death')) {
+      conflictType = 'life-and-death';
+      conflictElements.push('mortal stakes');
     }
-
-    // Year range filtering for entities
-    if (yearRange !== 'all') {
-      const yearRanges: Record<string, string[]> = {
-        '1920-1925': ['1920-01-01', '1925-12-31'],
-        '1925-1930': ['1925-01-01', '1930-12-31'],
-        '1930-1935': ['1930-01-01', '1935-12-31'],
-        '1935-1940': ['1935-01-01', '1940-12-31'], 
-        '1940-1945': ['1940-01-01', '1945-12-31'],
-        '1945-1950': ['1945-01-01', '1950-12-31'],
-        '1950-1955': ['1950-01-01', '1955-12-31'],
-        '1955-1961': ['1955-01-01', '1961-12-31']
-      };
-
-      if (yearRanges[yearRange]) {
-        const [startDate, endDate] = yearRanges[yearRange];
-        entityWhereClause += ` AND (e.active_period_start <= $${params.length + 1} AND e.active_period_end >= $${params.length + 2})`;
-        params.push(endDate, startDate);
-      }
+    
+    if (lowerContent.includes('trial') || lowerContent.includes('court') || lowerContent.includes('judge')) {
+      conflictType = 'legal';
+      conflictElements.push('legal proceedings');
     }
+    
+    if (lowerContent.includes('strike') || lowerContent.includes('protest') || lowerContent.includes('riot')) {
+      conflictType = 'social';
+      conflictElements.push('civil unrest');
+    }
+    
+    if (lowerContent.includes('war') || lowerContent.includes('battle') || lowerContent.includes('soldier')) {
+      conflictType = 'military';
+      conflictElements.push('wartime drama');
+    }
+    
+    if (lowerContent.includes('scandal') || lowerContent.includes('corruption') || lowerContent.includes('investigation')) {
+      conflictType = 'scandal';
+      conflictElements.push('institutional corruption');
+    }
+    
+    // Add dramatic elements
+    if (lowerContent.includes('secret') || lowerContent.includes('hidden')) {
+      conflictElements.push('hidden truths');
+    }
+    
+    if (lowerContent.includes('betrayal') || lowerContent.includes('affair')) {
+      conflictElements.push('personal betrayal');
+    }
+    
+    return { type: conflictType, elements: conflictElements };
+  }
 
-    // MASTER QUERY: Get high-potential entities with their dramatic relationships
-    const entityStoryQuery = `
-      WITH high_potential_entities AS (
-        SELECT 
-          e.id,
-          e.canonical_name,
-          e.entity_type,
-          e.biographical_summary,
-          e.historical_significance_score,
-          e.documentary_potential,
-          e.narrative_importance,
-          e.active_period_start,
-          e.active_period_end,
-          e.thematic_tags,
-          e.primary_location,
-          e.professional_categories
-        FROM intelligence_entities e
-        ${entityWhereClause}
-        ORDER BY e.documentary_potential DESC, e.historical_significance_score DESC
-        LIMIT $1
-      ),
-      dramatic_relationships AS (
-        SELECT 
-          r.source_entity_id,
-          r.target_entity_id,
-          r.relationship_type,
-          r.dramatic_tension,
-          r.narrative_significance,
-          r.human_interest_factor,
-          r.relationship_nature,
-          r.evidence_quotes,
-          r.first_documented,
-          r.last_documented,
-          e1.canonical_name as source_name,
-          e2.canonical_name as target_name,
-          e1.entity_type as source_type,
-          e2.entity_type as target_type
-        FROM intelligence_relationships r
-        JOIN high_potential_entities e1 ON r.source_entity_id = e1.id
-        JOIN high_potential_entities e2 ON r.target_entity_id = e2.id
-        ${relationshipWhereClause}
-        ORDER BY r.dramatic_tension DESC, r.narrative_significance DESC
-      )
-      SELECT 
-        hpe.*,
-        (
-          SELECT json_agg(
-            json_build_object(
-              'target_name', dr.target_name,
-              'target_type', dr.target_type,
-              'relationship_type', dr.relationship_type,
-              'dramatic_tension', dr.dramatic_tension,
-              'narrative_significance', dr.narrative_significance,
-              'human_interest', dr.human_interest_factor,
-              'relationship_nature', dr.relationship_nature,
-              'evidence_quotes', dr.evidence_quotes,
-              'timeframe', dr.first_documented || ' - ' || dr.last_documented
-            )
-          )
-          FROM dramatic_relationships dr 
-          WHERE dr.source_entity_id = hpe.id
-          LIMIT 5
-        ) as key_relationships,
-        (
-          SELECT json_agg(
-            json_build_object(
-              'source_name', dr.source_name,
-              'source_type', dr.source_type,
-              'relationship_type', dr.relationship_type,
-              'dramatic_tension', dr.dramatic_tension,
-              'narrative_significance', dr.narrative_significance
-            )
-          )
-          FROM dramatic_relationships dr 
-          WHERE dr.target_entity_id = hpe.id
-          LIMIT 3
-        ) as incoming_relationships
-      FROM high_potential_entities hpe
-      ORDER BY hpe.documentary_potential DESC
-      LIMIT ${count}
-    `;
+  /**
+   * IDENTIFY STAKES IN THE STORY
+   */
+  private identifyStakes(content: string, year: number): { description: string, level: string } {
+    const lowerContent = content.toLowerCase();
+    let stakes = 'personal reputation';
+    let level = 'moderate';
+    
+    // High stakes indicators
+    if (lowerContent.includes('life') || lowerContent.includes('death') || lowerContent.includes('murder')) {
+      stakes = 'life and death';
+      level = 'critical';
+    } else if (lowerContent.includes('fortune') || lowerContent.includes('bankruptcy') || lowerContent.includes('million')) {
+      stakes = 'financial ruin or fortune';
+      level = 'high';
+    } else if (lowerContent.includes('election') || lowerContent.includes('governor') || lowerContent.includes('mayor')) {
+      stakes = 'political power and future';
+      level = 'high';
+    } else if (lowerContent.includes('justice') || lowerContent.includes('innocent') || lowerContent.includes('guilty')) {
+      stakes = 'justice and vindication';
+      level = 'high';
+    }
+    
+    // Historical context adds stakes
+    if (year >= 1929 && year <= 1939) {
+      stakes += ' during the Great Depression';
+      level = 'high';
+    } else if (year >= 1940 && year <= 1945) {
+      stakes += ' during World War II';
+      level = 'critical';
+    }
+    
+    return { description: stakes, level };
+  }
 
-    try {
-      const result = await query(entityStoryQuery, params);
-      console.log(`🎪 Generated ${result.rows.length} entity-based stories`);
-      
-      const stories = result.rows.map((entity: any, index: number) => {
-        return this.transformEntityToDocumentaryStory(entity, index + 1);
-      });
-
-      return {
-        success: true,
-        stories: stories,
-        metadata: {
-          source: 'entity_intelligence',
-          category,
-          yearRange,
-          totalFound: result.rows.length,
-          method: 'entity_relationship_analysis'
-        }
-      };
-    } catch (error) {
-      console.error('Entity-based story generation failed:', error);
-      // Final fallback to legacy method
-      return await this.getLegacyStoryOptions(category, count);
+  /**
+   * CREATE DOCUMENTARY TITLE
+   */
+  private createDocumentaryTitle(originalTitle: string, character: string, conflict: any, year: number): string {
+    // Clean up the original title
+    const cleanTitle = originalTitle.replace(/[^\w\s]/g, '').trim();
+    
+    // Create compelling documentary title based on conflict type
+    if (conflict.type === 'life-and-death') {
+      return `Blood and Justice: ${cleanTitle} (${year})`;
+    } else if (conflict.type === 'legal') {
+      return `The ${cleanTitle} Trial: Justice in ${year}`;
+    } else if (conflict.type === 'social') {
+      return `Uprising: ${cleanTitle} and the Fight for Change`;
+    } else if (conflict.type === 'scandal') {
+      return `Behind Closed Doors: The ${cleanTitle} Scandal`;
+    } else if (character && character !== 'Unknown protagonist') {
+      return `${character}: The ${cleanTitle} Story`;
+    } else {
+      return `Untold Atlanta: ${cleanTitle} (${year})`;
     }
   }
 
   /**
-   * TRANSFORM ENTITY TO DOCUMENTARY STORY
-   * Convert entity relationship data into compelling documentary narratives
+   * CREATE DOCUMENTARY SUMMARY
    */
-  private transformEntityToDocumentaryStory(entity: any, storyNumber: number): any {
-    const relationships = entity.key_relationships || [];
-    const incomingRels = entity.incoming_relationships || [];
-    const allRelationships = [...relationships, ...incomingRels];
+  private createDocumentarySummary(content: string, character: string, conflict: any, stakes: any, year: number): string {
+    const sentences = content.split('.').filter(s => s.trim().length > 20);
+    const firstSentence = sentences[0] || content.substring(0, 100);
     
-    // Generate compelling documentary title and summary
-    const storyTitle = this.generateEntityStoryTitle(entity, relationships);
-    const documentarySummary = this.generateEntityStorySummary(entity, allRelationships);
-    const storyElements = this.extractEntityStoryElements(entity, allRelationships);
+    let summary = `In ${year}, ${firstSentence.trim()}.`;
     
-    // Calculate documentary metrics
-    const documentaryScore = this.calculateEntityDocumentaryScore(entity, allRelationships);
+    if (character && character !== 'Unknown protagonist') {
+      summary += ` Following ${character} through this ${conflict.type} conflict, `;
+    } else {
+      summary += ` This ${conflict.type} story reveals `;
+    }
     
-    // Determine time period
-    const startYear = entity.active_period_start ? new Date(entity.active_period_start).getFullYear() : 1920;
-    const endYear = entity.active_period_end ? new Date(entity.active_period_end).getFullYear() : 1961;
-    const primaryYear = Math.floor((startYear + endYear) / 2);
+    summary += `the ${stakes.description} that defined a pivotal moment in Atlanta's history.`;
+    
+    if (conflict.elements.length > 0) {
+      summary += ` Featuring ${conflict.elements.join(', ')}, this documentary explores `;
+      summary += `the human cost of ${stakes.level === 'critical' ? 'life-changing' : 'significant'} decisions `;
+      summary += `during a transformative period in the American South.`;
+    }
+    
+    return summary.length > 500 ? summary.substring(0, 497) + '...' : summary;
+  }
 
-    return {
-      id: `entity-story-${entity.id}`,
-      title: storyTitle,
-      summary: documentarySummary,
-      year: primaryYear,
-      yearRange: `${startYear}-${endYear}`,
-      category: this.categorizeEntityStory(entity, allRelationships),
-      documentaryPotential: Math.round(documentaryScore.potential * 100),
-      narrativeScore: Math.round(documentaryScore.narrative * 100),
-      archivalRichness: Math.round((entity.documentary_potential || 0.6) * 100),
-      evidenceQuality: Math.round(documentaryScore.evidence * 100),
-      themes: this.extractEntityThemes(entity, allRelationships),
-      storyElements: storyElements,
-      publicationDate: entity.active_period_start || '1920-01-01',
-      historicalContext: this.getHistoricalContext(primaryYear),
-      documentaryViability: this.assessEntityDocumentaryViability(entity, allRelationships),
-      entityType: entity.entity_type,
-      primaryCharacter: entity.canonical_name,
-      relationshipCount: allRelationships.length,
-      dramaticTension: Math.max(...allRelationships.map((r: any) => r.dramatic_tension || 0), 0)
-    };
+  /**
+   * CALCULATE DOCUMENTARY SCORE (VERSION 2)
+   */
+  private calculateDocumentaryScore2(content: string, conflict: any, characters: string[], visualElements: string[], year: number): number {
+    let score = 50; // Base score
+    
+    // Content quality
+    if (content.length > 500) score += 10;
+    if (content.length > 1000) score += 10;
+    
+    // Character strength
+    score += Math.min(characters.length * 8, 20);
+    
+    // Conflict drama
+    if (conflict.type === 'life-and-death') score += 20;
+    else if (conflict.type === 'scandal') score += 15;
+    else if (conflict.type === 'legal') score += 12;
+    else if (conflict.type === 'social') score += 10;
+    
+    // Visual potential
+    score += Math.min(visualElements.length * 5, 15);
+    
+    // Historical significance
+    if (year >= 1929 && year <= 1939) score += 8; // Depression era
+    if (year >= 1940 && year <= 1945) score += 12; // WWII era
+    if (year >= 1950 && year <= 1961) score += 6; // Civil rights era
+    
+    // Dramatic elements
+    score += Math.min(conflict.elements.length * 3, 12);
+    
+    return Math.min(Math.max(score, 30), 100);
+  }
+
+  /**
+   * CATEGORIZE STORY
+   */
+  private categorizeStory(content: string, title: string): string {
+    const text = (content + ' ' + title).toLowerCase();
+    
+    if (text.includes('murder') || text.includes('crime') || text.includes('trial')) {
+      return 'Crime & Justice';
+    }
+    if (text.includes('war') || text.includes('military') || text.includes('soldier')) {
+      return 'War & Military';
+    }
+    if (text.includes('women') || text.includes('suffrage') || text.includes('ladies')) {
+      return 'Women\'s Stories';
+    }
+    if (text.includes('business') || text.includes('economic') || text.includes('financial')) {
+      return 'Business & Economy';
+    }
+    if (text.includes('politics') || text.includes('election') || text.includes('governor')) {
+      return 'Politics';
+    }
+    if (text.includes('strike') || text.includes('protest') || text.includes('union')) {
+      return 'Protests & Reform';
+    }
+    if (text.includes('school') || text.includes('education') || text.includes('university')) {
+      return 'Education';
+    }
+    if (text.includes('entertainment') || text.includes('theater') || text.includes('music')) {
+      return 'Entertainment';
+    }
+    
+    return 'General Interest';
+  }
+
+  /**
+   * EXTRACT THEMES
+   */
+  private extractThemes(content: string, year: number): string[] {
+    const themes: string[] = [];
+    const lowerContent = content.toLowerCase();
+    
+    // Social themes
+    if (lowerContent.includes('justice') || lowerContent.includes('rights')) themes.push('Social Justice');
+    if (lowerContent.includes('family') || lowerContent.includes('marriage')) themes.push('Family');
+    if (lowerContent.includes('power') || lowerContent.includes('authority')) themes.push('Power & Authority');
+    if (lowerContent.includes('money') || lowerContent.includes('wealth')) themes.push('Economic Inequality');
+    if (lowerContent.includes('race') || lowerContent.includes('segregation')) themes.push('Race Relations');
+    if (lowerContent.includes('change') || lowerContent.includes('progress')) themes.push('Social Change');
+    if (lowerContent.includes('tradition') || lowerContent.includes('heritage')) themes.push('Tradition vs Progress');
+    
+    // Historical context themes
+    if (year >= 1929 && year <= 1939) themes.push('Great Depression Era');
+    if (year >= 1940 && year <= 1945) themes.push('World War II Impact');
+    if (year >= 1950 && year <= 1961) themes.push('Civil Rights Movement');
+    
+    return themes.length > 0 ? themes : ['Historical Drama'];
+  }
+
+  /**
+   * GET VIABILITY REASONS
+   */
+  private getViabilityReasons(characters: string[], conflict: any, visualElements: string[], year: number): string[] {
+    const reasons: string[] = [];
+    
+    if (characters.length > 0) {
+      reasons.push(`Strong character focus with ${characters.length} identified individuals`);
+    }
+    
+    if (conflict.elements.length > 2) {
+      reasons.push(`Multiple dramatic elements including ${conflict.elements.slice(0, 2).join(' and ')}`);
+    }
+    
+    if (visualElements.length > 0) {
+      reasons.push(`Rich archival potential with ${visualElements.join(', ')}`);
+    }
+    
+    if (year >= 1940 && year <= 1945) {
+      reasons.push('WWII-era significance adds historical weight');
+    }
+    
+    if (conflict.type === 'life-and-death') {
+      reasons.push('Life-and-death stakes create compelling narrative tension');
+    }
+    
+    return reasons.length > 0 ? reasons : ['Historical significance and archival value'];
   }
 } 

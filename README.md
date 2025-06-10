@@ -294,6 +294,29 @@ curl /api/narrative/health
 - **Production deployment**: Railway-ready with health monitoring
 - **Comprehensive documentation**: Technical details and development insights
 
+## Known Issues & Solutions
+
+### Article Content Access Issue
+
+**Problem**: The StoryMap Intelligence database contains 282,388 historical articles (1920-1961 Atlanta Constitution), but content fields are often NULL/empty due to ETL pipeline issues during historical document processing.
+
+**Impact**: 
+- Prevents full-text search functionality
+- Limits documentary story generation capabilities
+- Requires fallback strategies for content analysis
+
+**Solution Implemented**:
+1. **Dual Content Strategy**: Query both `content` and `processed_content` fields
+2. **Content Validation**: Filter articles with substantial content (>100 chars)
+3. **Intelligent Fallbacks**: Use entity relationships when content unavailable
+4. **Pre-scored Metrics**: Leverage `documentary_potential` scores from StoryMap Intelligence
+
+**Developer Notes**:
+- Always check both content fields: `content || processed_content`
+- Implement content length validation in queries
+- Provide meaningful fallbacks for NULL content scenarios
+- Document any new content access patterns for team consistency
+
 ---
 
 **System Version**: StoryMine v3.0.0  

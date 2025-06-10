@@ -247,4 +247,36 @@ Each article contains sophisticated pre-scoring:
 - **Graceful degradation**: System works with curated examples when full database unavailable
 - **Production-ready insights**: Actionable documentary development guidance vs. just story discovery
 
-*Last Updated: June 8, 2025 - Comprehensive system rebuild and intelligence integration* 
+*Last Updated: June 8, 2025 - Comprehensive system rebuild and intelligence integration*
+
+## CRITICAL: Article Content Access Solution
+
+### The NULL Content Problem
+
+**Issue**: The StoryMap Intelligence database contains 282,388 articles, but the `content` fields are frequently NULL/empty, preventing full-text analysis for documentary story generation.
+
+**Root Cause**: ETL pipeline issues during article content extraction from historical newspaper archives (1920-1961 Atlanta Constitution).
+
+**Solution Implemented**: 
+1. **Dual Content Field Strategy**: Query both `content` AND `processed_content` fields
+2. **Content Validation**: Filter for articles with substantial content (>100 characters)
+3. **Fallback Strategy**: Use entity/relationship data when content unavailable
+4. **Intelligence-First Approach**: Leverage pre-scored documentary_potential metrics
+
+### Technical Implementation
+
+```sql
+-- Content Access Query Pattern
+SELECT content, processed_content 
+FROM intelligence_articles 
+WHERE (content IS NOT NULL AND length(content) > 100)
+   OR (processed_content IS NOT NULL AND length(processed_content) > 100)
+```
+
+**Content Priority Order**:
+1. `processed_content` (StoryMap's enhanced text)
+2. `content` (raw OCR text)  
+3. Entity relationship analysis (fallback)
+4. Legacy curated examples (final fallback)
+
+--- 
