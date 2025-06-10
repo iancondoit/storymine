@@ -123,61 +123,138 @@ async function searchArticles(searchTerm: string, limit: number = 10): Promise<a
       `(a.title ILIKE $${i + 1} OR a.content ILIKE $${i + 1})`
     ).join(' OR ');
     
-    // First, get a much larger sample to analyze (search up to 500 articles)
+    // Enhanced search query prioritizing substantial content and documentary potential
     const comprehensiveSearchQuery = `
       SELECT a.id, a.title, a.content, a.publication_date,
              a.publication_name, a.created_at,
              LENGTH(a.content) as content_length,
-             -- Score articles based on documentary potential indicators
+             -- Advanced documentary scoring based on content quality and relevance
              CASE 
-               WHEN ${enhancedTerms.map((_, i) => `a.title ILIKE $${i + 1}`).join(' OR ')} THEN 3  -- Enhanced term in title
-               WHEN (${enhancedTerms.map((_, i) => `a.content ILIKE $${i + 1}`).join(' OR ')}) AND LENGTH(a.content) > 500 THEN 2  -- Enhanced term in substantial content
-               ELSE 1
-             END as relevance_score
+               WHEN LENGTH(a.content) > 5000 AND (${enhancedTerms.map((_, i) => `a.title ILIKE $${i + 1}`).join(' OR ')}) THEN 95  -- Substantial content + title match
+               WHEN LENGTH(a.content) > 3000 AND (${enhancedTerms.map((_, i) => `a.title ILIKE $${i + 1}`).join(' OR ')}) THEN 90  -- Good content + title match
+               WHEN LENGTH(a.content) > 5000 AND (${enhancedTerms.map((_, i) => `a.content ILIKE $${i + 1}`).join(' OR ')}) THEN 85  -- Substantial content + content match
+               WHEN LENGTH(a.content) > 3000 AND (${enhancedTerms.map((_, i) => `a.content ILIKE $${i + 1}`).join(' OR ')}) THEN 80  -- Good content + content match
+               WHEN LENGTH(a.content) > 1500 AND (${enhancedTerms.map((_, i) => `a.content ILIKE $${i + 1}`).join(' OR ')}) THEN 70  -- Medium content + match
+               WHEN LENGTH(a.content) > 800 AND (${enhancedTerms.map((_, i) => `a.content ILIKE $${i + 1}`).join(' OR ')}) THEN 60   -- Basic content + match
+               WHEN (${enhancedTerms.map((_, i) => `a.title ILIKE $${i + 1}`).join(' OR ')}) THEN 40  -- Title match only
+               WHEN (${enhancedTerms.map((_, i) => `a.content ILIKE $${i + 1}`).join(' OR ')}) THEN 30  -- Content match only
+               ELSE 10
+             END as documentary_potential
       FROM intelligence_articles a
-      WHERE ${whereConditions}
+      WHERE (${whereConditions}) 
+        AND LENGTH(a.content) > 200  -- Filter out headers and short snippets
+        AND a.content IS NOT NULL
+        AND a.title IS NOT NULL
+        AND a.title NOT ILIKE '%SOUTH''S STANDARD NEWSPAPER%'  -- Filter out newspaper headers
+        AND a.title NOT ILIKE '%CONSTITUTION, ATLANTA, GA%'     -- Filter out page headers
+        AND a.title NOT ILIKE '%PAGE %'                         -- Filter out page numbers
       ORDER BY 
-        relevance_score DESC,
-        LENGTH(a.content) DESC,  -- Prefer longer, more detailed articles
+        documentary_potential DESC,
+        LENGTH(a.content) DESC,
         a.publication_date DESC
       LIMIT $${enhancedTerms.length + 1}
     `;
     
-    const comprehensiveLimit = Math.min(500, limit * 10); // Search up to 500 articles
     const searchParams = [
       ...enhancedTerms.map(term => `%${term}%`), // Individual parameters for each term
-      comprehensiveLimit
+      limit * 3  // Get more candidates for better selection
     ];
     
     const result = await query(comprehensiveSearchQuery, searchParams);
     
-    console.log(`📊 Comprehensive search found: ${result.rows.length} articles (analyzing for documentary potential)`);
+    console.log(`📊 Found ${result.rows.length} quality articles (filtering headers and short content)`);
     
     if (result.rows.length === 0) {
-      return [];
+      console.log('No substantial articles found, trying broader search...');
+      
+      // Fallback search with just the original term and lower content threshold
+      const fallbackQuery = `
+        SELECT a.id, a.title, a.content, a.publication_date,
+               a.publication_name, a.created_at,
+               LENGTH(a.content) as content_length,
+               50 as documentary_potential
+        FROM intelligence_articles a
+        WHERE (a.title ILIKE $1 OR a.content ILIKE $1)
+          AND LENGTH(a.content) > 100
+          AND a.content IS NOT NULL
+        ORDER BY LENGTH(a.content) DESC
+        LIMIT $2
+      `;
+      
+      const fallbackResult = await query(fallbackQuery, [`%${searchTerm}%`, limit]);
+      console.log(`📰 Fallback search found ${fallbackResult.rows.length} articles`);
+      return fallbackResult.rows;
     }
     
-    // If we have many results, let Claude help select the best ones
-    if (result.rows.length > limit && result.rows.length > 10) {
-      console.log(`🎯 Using Claude AI to select best ${limit} articles from ${result.rows.length} candidates`);
+    // Add documentary scoring based on content analysis
+    const scoredArticles = result.rows.map(article => {
+      let documentaryScore = article.documentary_potential || 50;
       
-      // Group articles by decade for better analysis
-      const articlesByDecade = groupArticlesByDecade(result.rows);
+      // Clean and analyze content for documentary potential
+      const cleanContent = cleanArticleContent(article.content || '');
+      const titleText = (article.title || '').toLowerCase();
+      const contentText = cleanContent.toLowerCase();
       
-      // Take a representative sample from each decade, plus the highest scoring ones
-      const selectedArticles = selectBestArticlesForDocumentary(result.rows, limit);
+      // Boost for historical significance indicators
+      if (contentText.includes('first time') || contentText.includes('historic') || contentText.includes('unprecedented')) documentaryScore += 5;
+      if (contentText.includes('tragedy') || contentText.includes('crisis') || contentText.includes('scandal')) documentaryScore += 5;
+      if (contentText.includes('victory') || contentText.includes('triumph') || contentText.includes('breakthrough')) documentaryScore += 5;
       
-      console.log(`✨ Selected ${selectedArticles.length} highest-potential articles`);
-      return selectedArticles;
-    }
+      // Boost for human interest elements
+      if (contentText.includes('family') || contentText.includes('children') || contentText.includes('mother')) documentaryScore += 3;
+      if (contentText.includes('testimony') || contentText.includes('witness') || contentText.includes('survivor')) documentaryScore += 3;
+      
+      // Boost for archival richness
+      if (contentText.includes('photograph') || contentText.includes('documents') || contentText.includes('records')) documentaryScore += 3;
+      if (contentText.includes('interview') || contentText.includes('statement') || contentText.includes('account')) documentaryScore += 3;
+      
+      // Cap the score at 100
+      documentaryScore = Math.min(100, documentaryScore);
+      
+      return {
+        ...article,
+        documentaryScore,
+        content_summary: cleanContent.substring(0, 500) + (cleanContent.length > 500 ? '...' : '')
+      };
+    });
     
-    console.log(`📰 Returning ${result.rows.length} articles (small result set)`);
-    return result.rows.slice(0, limit);
+    // Sort by documentary score and return
+    scoredArticles.sort((a, b) => b.documentaryScore - a.documentaryScore);
+    
+    console.log(`✨ Returning ${Math.min(limit, scoredArticles.length)} highest-scoring articles`);
+    return scoredArticles.slice(0, limit);
     
   } catch (error) {
     console.error('❌ Error in comprehensive article search:', error);
     return [];
   }
+}
+
+/**
+ * Clean article content of OCR artifacts and formatting issues
+ */
+function cleanArticleContent(content: string): string {
+  if (!content) return '';
+  
+  return content
+    // Remove common OCR artifacts
+    .replace(/[€£¢]/g, 'e')
+    .replace(/[àáâãäå]/g, 'a')
+    .replace(/[èéêë]/g, 'e')
+    .replace(/[ìíîï]/g, 'i')
+    .replace(/[òóôõö]/g, 'o')
+    .replace(/[ùúûü]/g, 'u')
+    // Fix common OCR mistakes
+    .replace(/\bon\b/g, 'on')
+    .replace(/\bin\b/g, 'in')
+    .replace(/\bthe\b/g, 'the')
+    // Remove excessive whitespace
+    .replace(/\s+/g, ' ')
+    // Remove page markers and headers
+    .replace(/PAGE \w+/gi, '')
+    .replace(/THE CONSTITUTION, ATLANTA, GA[.,]*/gi, '')
+    .replace(/THE SOUTH'S STANDARD NEWSPAPER/gi, '')
+    .trim();
 }
 
 /**

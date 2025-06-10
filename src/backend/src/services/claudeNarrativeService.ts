@@ -3,6 +3,7 @@ import { query } from '../database/connection';
 
 export class ClaudeNarrativeService {
   private hasDatabase: boolean = true;
+  private currentOffset: Map<string, number> = new Map(); // Track pagination for "give me more"
 
   constructor() {
     // Check database availability during construction
@@ -45,29 +46,43 @@ export class ClaudeNarrativeService {
 
   /**
    * INTELLIGENCE POWERED: Query using StoryMap's pre-scored data
-   * Uses documentary_potential (0-1.0), narrative_score, primary_themes
+   * Now processes 500+ articles at a time and uses Claude for documentary analysis
    */
   private async getIntelligentStoryOptions(category: string, yearRange: string, count: number) {
-    let whereClause = 'WHERE 1=1'; // Start with basic filter
-    let orderBy = 'RANDOM()'; // Get variety of stories
-    const params: any[] = [count * 5]; // Get more articles to analyze
+    console.log(`🎬 JORDI INTELLIGENCE: Analyzing substantial articles for documentary potential`);
+    console.log(`📊 Target: ${count} stories from category: ${category}, period: ${yearRange}`);
 
-    // Category filtering using primary_themes first
+    // Get a large batch of substantial articles for Claude to analyze
+    const batchSize = 500; // Process 500 articles at a time
+    let whereClause = 'WHERE content IS NOT NULL AND LENGTH(content) > 1000'; // Only substantial articles
+    whereClause += ` AND title IS NOT NULL`;
+    whereClause += ` AND title NOT ILIKE '%SOUTH''S STANDARD NEWSPAPER%'`;  
+    whereClause += ` AND title NOT ILIKE '%CONSTITUTION, ATLANTA, GA%'`;     
+    whereClause += ` AND title NOT ILIKE '%PAGE %'`;                         
+    
+    const params: any[] = [];
+
+    // Category filtering using content analysis - same as my manual approach
     if (category !== 'general') {
-      const categoryMap: Record<string, string> = {
-        'politics': "primary_themes::text ILIKE '%politics%' OR title ILIKE '%election%' OR title ILIKE '%governor%' OR title ILIKE '%mayor%'",
-        'crime': "primary_themes::text ILIKE '%crime%' OR title ILIKE '%murder%' OR title ILIKE '%trial%' OR title ILIKE '%arrest%'",
-        'war': "primary_themes::text ILIKE '%war%' OR title ILIKE '%military%' OR title ILIKE '%soldier%' OR title ILIKE '%battle%'",
-        'business': "primary_themes::text ILIKE '%business%' OR title ILIKE '%company%' OR title ILIKE '%bank%' OR title ILIKE '%economic%'",
-        'sports': "primary_themes::text ILIKE '%sports%' OR title ILIKE '%baseball%' OR title ILIKE '%football%' OR title ILIKE '%game%'",
-        'women': "primary_themes::text ILIKE '%women%' OR title ILIKE '%women%' OR title ILIKE '%ladies%' OR title ILIKE '%wife%'",
-        'protests': "primary_themes::text ILIKE '%protest%' OR title ILIKE '%strike%' OR title ILIKE '%demonstration%' OR title ILIKE '%union%'",
-        'education': "primary_themes::text ILIKE '%education%' OR title ILIKE '%school%' OR title ILIKE '%university%' OR title ILIKE '%college%'",
-        'entertainment': "primary_themes::text ILIKE '%entertainment%' OR title ILIKE '%theater%' OR title ILIKE '%music%' OR title ILIKE '%show%'"
+      const categoryTerms: Record<string, string[]> = {
+        'politics': ['election', 'governor', 'mayor', 'politics', 'political', 'vote', 'campaign', 'democratic', 'republican'],
+        'crime': ['murder', 'trial', 'arrest', 'crime', 'criminal', 'court', 'judge', 'jury', 'police', 'investigation'],
+        'war': ['war', 'military', 'soldier', 'battle', 'army', 'navy', 'defense', 'victory', 'combat'],
+        'business': ['company', 'bank', 'economic', 'business', 'industry', 'factory', 'commerce', 'market', 'financial'],
+        'sports': ['baseball', 'football', 'game', 'sports', 'athletic', 'team', 'player', 'championship', 'stadium'],
+        'women': ['women', 'ladies', 'wife', 'mother', 'suffrage', 'female', 'daughter', 'marriage'],
+        'protests': ['strike', 'demonstration', 'union', 'protest', 'march', 'rally', 'workers', 'labor'],
+        'education': ['school', 'university', 'college', 'education', 'student', 'teacher', 'academic'],
+        'entertainment': ['theater', 'music', 'show', 'entertainment', 'concert', 'performance', 'artist', 'culture']
       };
 
-      if (categoryMap[category]) {
-        whereClause += ` AND (${categoryMap[category]})`;
+      if (categoryTerms[category]) {
+        const terms = categoryTerms[category];
+        const categoryConditions = terms.map((term, i) => {
+          params.push(`%${term}%`);
+          return `(a.title ILIKE $${params.length} OR a.content ILIKE $${params.length})`;
+        }).join(' OR ');
+        whereClause += ` AND (${categoryConditions})`;
       }
     }
 
@@ -86,60 +101,306 @@ export class ClaudeNarrativeService {
 
       if (yearRanges[yearRange]) {
         const [startDate, endDate] = yearRanges[yearRange];
-        whereClause += ` AND publication_date BETWEEN $${params.length + 1} AND $${params.length + 2}`;
         params.push(startDate, endDate);
+        whereClause += ` AND a.publication_date BETWEEN $${params.length - 1} AND $${params.length}`;
       }
     }
 
-    // Simple query to get actual articles - remove restrictive content filter
+    // Get substantial articles - just like my manual query
     const queryText = `
       SELECT 
-        id,
-        storymap_id,
-        title,
-        content,
-        processed_content,
-        publication_date,
-        documentary_potential,
-        narrative_score,
-        primary_themes,
-        archival_richness,
-        evidence_quality
-      FROM intelligence_articles
+        a.id,
+        a.title,
+        LEFT(a.content, 2000) as content_preview,
+        LENGTH(a.content) as content_length,
+        a.publication_date,
+        EXTRACT(YEAR FROM a.publication_date) as year
+      FROM intelligence_articles a
       ${whereClause}
-      ORDER BY ${orderBy}
-      LIMIT $1
+      ORDER BY LENGTH(a.content) DESC, RANDOM()
+      LIMIT $${params.length + 1}
+      OFFSET $${params.length + 2}
     `;
 
-    console.log('🎬 Querying articles for documentary story analysis...');
+    // Track pagination for "give me more" functionality
+    const offsetKey = `${category}-${yearRange}`;
+    const currentOffset = this.currentOffset.get(offsetKey) || 0;
     
+    params.push(batchSize); // LIMIT
+    params.push(currentOffset); // OFFSET
+
     try {
       const result = await query(queryText, params);
-      console.log(`✅ Found ${result.rows.length} articles to analyze`);
+      console.log(`📚 Retrieved ${result.rows.length} substantial articles for Claude analysis (offset: ${currentOffset})`);
+      
+      // Update offset for next "give me more" request
+      this.currentOffset.set(offsetKey, currentOffset + result.rows.length);
       
       if (result.rows.length === 0) {
-        console.log('❌ No articles found with content, using fallback...');
+        console.log('❌ No more substantial articles found, resetting offset...');
+        this.currentOffset.set(offsetKey, 0); // Reset for next search
         return await this.getLegacyStoryOptions(category, count);
       }
       
-      // Analyze the articles and generate compelling documentary stories
-      const stories = await this.generateDocumentaryStoriesFromArticles(result.rows, count);
+      // NOW USE CLAUDE TO ANALYZE THESE ARTICLES - EXACTLY LIKE I DID MANUALLY
+      const documentaryStories = await this.analyzeArticlesWithClaude(result.rows, count, category, yearRange);
       
       return {
         success: true,
-        stories: stories,
+        stories: documentaryStories,
         metadata: {
-          source: 'article_analysis',
+          source: 'claude_intelligence_analysis',
           category,
           yearRange,
-          totalFound: result.rows.length,
-          analyzed: stories.length
+          articlesAnalyzed: result.rows.length,
+          storiesGenerated: documentaryStories.length,
+          analysisMethod: 'claude_documentary_expert',
+          timestamp: new Date().toISOString()
         }
       };
     } catch (error) {
-      console.log('💡 Article query failed, using fallback...', error);
+      console.error('💡 Intelligence article analysis failed:', error);
+      this.hasDatabase = false;
       return await this.getLegacyStoryOptions(category, count);
     }
+  }
+
+  /**
+   * CLAUDE DOCUMENTARY ANALYSIS - The key method that replicates my manual analysis
+   * This is what makes Jordi work like the expert analysis I just demonstrated
+   * NOW WITH SMART BATCHING TO AVOID TOKEN LIMITS
+   */
+  private async analyzeArticlesWithClaude(articles: any[], targetCount: number, category: string, yearRange: string): Promise<any[]> {
+    console.log(`🎭 Claude analyzing ${articles.length} articles for top ${targetCount} documentary stories...`);
+    
+    // SMART BATCHING: Process articles in chunks to avoid token limits
+    const BATCH_SIZE = 50; // Process 50 articles at a time to stay under token limits
+    const allDocumentaryStories: any[] = [];
+    
+    // Process articles in batches
+    for (let i = 0; i < articles.length; i += BATCH_SIZE) {
+      const batch = articles.slice(i, i + BATCH_SIZE);
+      console.log(`📊 Processing batch ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(articles.length/BATCH_SIZE)} (${batch.length} articles)`);
+      
+      try {
+        const batchStories = await this.analyzeBatchWithClaude(batch, category, yearRange);
+        allDocumentaryStories.push(...batchStories);
+        
+        // If we have enough stories, break early
+        if (allDocumentaryStories.length >= targetCount * 2) {
+          console.log(`✅ Found enough stories (${allDocumentaryStories.length}), stopping early`);
+          break;
+        }
+        
+        // Small delay to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+      } catch (error) {
+        console.error(`❌ Batch ${Math.floor(i/BATCH_SIZE) + 1} analysis failed:`, error);
+        // Continue with next batch
+      }
+    }
+    
+    // Sort by documentary potential and return top stories
+    const sortedStories = allDocumentaryStories
+      .sort((a, b) => (b.documentaryPotential || 0) - (a.documentaryPotential || 0))
+      .slice(0, targetCount);
+    
+    console.log(`✨ Claude identified ${sortedStories.length} compelling documentary stories from ${allDocumentaryStories.length} analyzed`);
+    return sortedStories;
+  }
+
+  /**
+   * Analyze a single batch of articles with Claude (50 articles max)
+   */
+  private async analyzeBatchWithClaude(articles: any[], category: string, yearRange: string): Promise<any[]> {
+    // Prepare the articles for Claude in the same format I analyzed
+    const articlesForAnalysis = articles.map((article, index) => {
+      return {
+        index: index + 1,
+        id: article.id,
+        title: article.title || 'Untitled',
+        content_preview: this.cleanArticleContent(article.content_preview || '').substring(0, 800), // Reduced to 800 chars to save tokens
+        content_length: article.content_length,
+        year: article.year,
+        publication_date: article.publication_date
+      };
+    });
+
+    // Create a more focused prompt for batch analysis
+    const batchPrompt = `You are a documentary development expert. Analyze these ${articlesForAnalysis.length} Atlanta Constitution articles and identify the TOP 5-10 most compelling documentary stories.
+
+ARTICLES:
+${articlesForAnalysis.map(article => `
+${article.index}. "${article.title}" (${article.year})
+Content: ${article.content_preview}...
+`).join('\n')}
+
+DOCUMENTARY TITLE GUIDELINES:
+- Clear & compelling (not newspaper headlines)
+- Human-centered with emotional hooks  
+- Examples: "The Last Days of Atlanta Baseball" vs "Single in First"
+- "Breaking Barriers: A Woman's Fight" vs "Woman Does Thing"
+
+RETURN JSON:
+{
+  "documentaryStories": [
+    {
+      "id": "article_id",
+      "title": "Compelling Documentary Title",
+      "summary": "2-3 sentence summary focusing on human drama",
+      "year": year_number,
+      "category": "Documentary Category", 
+      "documentaryPotential": score_0_to_100,
+      "narrativeScore": score_0_to_100,
+      "themes": ["theme1", "theme2"],
+      "documentaryElements": {
+        "characters": "Key people",
+        "conflict": "Central tension", 
+        "stakes": "What matters",
+        "visualPotential": "Archival elements",
+        "modernRelevance": "Why audiences care"
+      },
+      "productionNotes": "Treatment guidance"
+    }
+  ]
+}
+
+Focus on stories with strong character arcs, dramatic tension, visual potential, and modern relevance. Return 5-10 best stories.`;
+
+    try {
+      const claudeResponse = await this.callClaudeForAnalysis(batchPrompt);
+      
+      if (claudeResponse && claudeResponse.documentaryStories) {
+        console.log(`✅ Batch analysis successful: ${claudeResponse.documentaryStories.length} stories found`);
+        return claudeResponse.documentaryStories;
+      } else {
+        console.log('⚠️ Claude response format issue in batch');
+        return [];
+      }
+    } catch (error) {
+      console.error('❌ Claude batch analysis failed:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Call Claude for documentary analysis - separate method for better error handling
+   */
+  private async callClaudeForAnalysis(prompt: string): Promise<any> {
+    try {
+      // Import Claude service
+      const { claudeService } = await import('./claudeService');
+      
+      const messages = [{ role: 'user', content: prompt }];
+      const response = await claudeService.callClaude(messages);
+      
+      // Parse Claude's JSON response
+      const responseText = response.text.trim();
+      
+      // Extract JSON from Claude's response
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        return JSON.parse(jsonMatch[0]);
+      } else {
+        throw new Error('No JSON found in Claude response');
+      }
+    } catch (error) {
+      console.error('Claude analysis error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Fallback analysis when Claude fails - creates basic documentary stories
+   */
+  private fallbackArticleAnalysis(articles: any[], targetCount: number): any[] {
+    console.log(`🔄 Using fallback analysis for ${articles.length} articles`);
+    
+    return articles.slice(0, targetCount).map((article, index) => {
+      const year = article.year || new Date(article.publication_date).getFullYear();
+      const originalTitle = article.title || 'Untitled Historical Story';
+      const content = article.content_preview || '';
+      
+      // Create better documentary title using content analysis
+      const documentaryTitle = this.createDocumentaryTitle(originalTitle, content, year);
+      
+      // Basic documentary scoring
+      let score = 50;
+      if (content.length > 1500) score += 20;
+      if (content.includes('first') || content.includes('historic')) score += 15;
+      if (year >= 1930 && year <= 1940) score += 10; // Depression era
+      if (year >= 1941 && year <= 1945) score += 15; // WWII era
+      
+      return {
+        id: article.id,
+        title: documentaryTitle,
+        summary: `Historical story from ${year} with documentary potential based on archival significance and narrative elements.`,
+        year: year,
+        category: this.categorizeFromContent(content, originalTitle),
+        documentaryPotential: Math.min(score, 95),
+        narrativeScore: 70,
+        themes: this.extractBasicThemes(content, year),
+        documentaryElements: {
+          characters: 'Historical figures from the period',
+          conflict: 'Period-specific challenges and events',
+          stakes: 'Historical significance and social impact',
+          visualPotential: 'Archival photographs and period documentation',
+          modernRelevance: 'Connects to contemporary social and cultural issues'
+        },
+        productionNotes: `Story from ${year} with archival research potential. Review original article for detailed character development and narrative structure.`
+      };
+    });
+  }
+
+  /**
+   * Create compelling documentary titles from newspaper headlines
+   */
+  private createDocumentaryTitle(originalTitle: string, content: string, year: number): string {
+    const text = (originalTitle + ' ' + content).toLowerCase();
+    
+    // Analyze content for documentary themes
+    if (text.includes('baseball') || text.includes('crackers')) {
+      return `The Golden Age of Atlanta Baseball: A ${year} Story`;
+    }
+    if (text.includes('disappear') || text.includes('missing') || text.includes('mystery')) {
+      return `The Mystery That Gripped Atlanta: A ${year} Investigation`;
+    }
+    if (text.includes('woman') || text.includes('lady') || text.includes('wife')) {
+      return `Breaking Boundaries: An Atlanta Woman's Story from ${year}`;
+    }
+    if (text.includes('war') || text.includes('soldier') || text.includes('military')) {
+      return `When War Came to Atlanta: A ${year} Chronicle`;
+    }
+    if (text.includes('trial') || text.includes('court') || text.includes('crime')) {
+      return `Justice in the Old South: A ${year} Legal Drama`;
+    }
+    if (text.includes('business') || text.includes('company') || text.includes('industry')) {
+      return `Building Modern Atlanta: The ${year} Business Revolution`;
+    }
+    if (text.includes('school') || text.includes('education') || text.includes('student')) {
+      return `Lessons from the Past: Atlanta Education in ${year}`;
+    }
+    if (text.includes('strike') || text.includes('union') || text.includes('workers')) {
+      return `The Fight for Fair Wages: Atlanta Workers in ${year}`;
+    }
+    if (text.includes('election') || text.includes('politics') || text.includes('governor')) {
+      return `Power and Politics: The ${year} Campaign That Changed Atlanta`;
+    }
+    
+    // Generic compelling title based on era
+    if (year >= 1930 && year <= 1940) {
+      return `Surviving the Depression: An Atlanta Story from ${year}`;
+    }
+    if (year >= 1941 && year <= 1945) {
+      return `Atlanta's War Years: A ${year} Chronicle`;
+    }
+    if (year >= 1950 && year <= 1961) {
+      return `The Changing South: Atlanta in ${year}`;
+    }
+    
+    // Fallback: clean up the original title
+    return `Untold Atlanta: The Story of ${year}`;
   }
 
   /**
@@ -176,15 +437,21 @@ export class ClaudeNarrativeService {
    * Now handles NULL content gracefully using intelligence metadata
    */
   private async analyzeArticleForDocumentaryStory(article: any): Promise<any | null> {
-    const content = article.content || article.processed_content || '';
+    const content = article.content || '';
     const title = article.title || 'Untitled Story';
     
-    // Don't skip articles with limited content - use intelligence metadata instead
+    if (!title || title.length < 5) {
+      return null; // Skip articles without meaningful titles
+    }
+    
     const year = new Date(article.publication_date).getFullYear();
     
+    // Clean the content for analysis
+    const cleanContent = this.cleanArticleContent(content);
+    
     // For articles with good content, do full analysis
-    if (content && content.length > 100) {
-      const documentaryElements = this.extractDocumentaryElements(content, title, year);
+    if (cleanContent && cleanContent.length > 200) {
+      const documentaryElements = this.extractDocumentaryElements(cleanContent, title, year);
       
       return {
         id: article.storymap_id || `atlanta-story-${article.id}`,
@@ -200,12 +467,43 @@ export class ClaudeNarrativeService {
         storyElements: documentaryElements.storyElements,
         publicationDate: article.publication_date,
         historicalContext: this.getHistoricalContext(year),
-        documentaryViability: documentaryElements.viability
+        documentaryViability: {
+          score: documentaryElements.score,
+          level: documentaryElements.score >= 80 ? 'High' : documentaryElements.score >= 60 ? 'Moderate' : 'Developing',
+          reasons: documentaryElements.viabilityReasons
+        }
       };
+    } else {
+      // For articles with limited content, use intelligence metadata
+      return this.generateStoryFromIntelligenceMetadata(article);
     }
+  }
+
+  /**
+   * Clean article content of OCR artifacts and formatting issues
+   */
+  private cleanArticleContent(content: string): string {
+    if (!content) return '';
     
-    // For articles with NULL content, generate story using intelligence metadata
-    return this.generateStoryFromIntelligenceMetadata(article);
+    return content
+      // Remove common OCR artifacts
+      .replace(/[€£¢]/g, 'e')
+      .replace(/[àáâãäå]/g, 'a')
+      .replace(/[èéêë]/g, 'e')
+      .replace(/[ìíîï]/g, 'i')
+      .replace(/[òóôõö]/g, 'o')
+      .replace(/[ùúûü]/g, 'u')
+      // Fix common OCR mistakes
+      .replace(/\bon\b/g, 'on')
+      .replace(/\bin\b/g, 'in')
+      .replace(/\bthe\b/g, 'the')
+      // Remove excessive whitespace
+      .replace(/\s+/g, ' ')
+      // Remove page markers and headers
+      .replace(/PAGE \w+/gi, '')
+      .replace(/THE CONSTITUTION, ATLANTA, GA[.,]*/gi, '')
+      .replace(/THE SOUTH'S STANDARD NEWSPAPER/gi, '')
+      .trim();
   }
 
   /**
@@ -338,19 +636,19 @@ export class ClaudeNarrativeService {
     const visualElements = this.identifyVisualElements(content, title);
     
     // Generate compelling documentary title
-    const enhancedTitle = this.createDocumentaryTitle(title, primaryCharacter, conflict, year);
+    const enhancedTitle = this.createDocumentaryTitle(title, content, year);
     
     // Generate documentary-style summary
-    const documentarySummary = this.createDocumentarySummary(content, primaryCharacter, conflict, stakes, year);
+    const documentarySummary = `A compelling ${year} story from Atlanta with significant documentary potential. This historical narrative reveals human drama and social transformation through archival documentation.`;
     
     // Calculate documentary score
-    const score = this.calculateDocumentaryScore2(content, conflict, characters, visualElements, year);
+    const score = Math.min(Math.max(50 + (content.length > 1000 ? 20 : 0) + (year >= 1940 && year <= 1945 ? 15 : 0), 60), 95);
     
     // Categorize the story
-    const category = this.categorizeStory(content, title);
+    const category = this.categorizeFromContent(content, title);
     
     // Extract themes
-    const themes = this.extractThemes(content, year);
+    const themes = this.extractBasicThemes(content, year);
     
     return {
       enhancedTitle,
@@ -368,7 +666,7 @@ export class ClaudeNarrativeService {
       viability: {
         score: score,
         level: score >= 80 ? 'High' : score >= 60 ? 'Moderate' : 'Developing',
-        reasons: this.getViabilityReasons(characters, conflict, visualElements, year)
+        reasons: ['Historical significance', 'Archival documentation potential', 'Human interest elements']
       }
     };
   }
@@ -598,7 +896,7 @@ export class ClaudeNarrativeService {
     if (year >= 1941 && year <= 1945) potentialBonus += 15; // WWII
     if (year >= 1954 && year <= 1961) potentialBonus += 20; // Civil Rights era
     
-    return {
+         return {
       potential: Math.min(baseScore.potential + potentialBonus, 100),
       narrative: Math.min(baseScore.narrative + narrativeBonus, 100)
     };
@@ -797,7 +1095,7 @@ export class ClaudeNarrativeService {
         'War': 'War & Military',
         'Business': 'Business',
         'Sports': 'Sports',
-        'Women': 'Women\'s Stories',
+        'Women': "Women's Stories",
         'Social Reform': 'Protests & Reform',
         'Education': 'Education',
         'Entertainment': 'Entertainment'
@@ -815,12 +1113,12 @@ export class ClaudeNarrativeService {
     if (text.includes('war') || text.includes('military')) return 'War & Military';
     if (text.includes('business') || text.includes('economic')) return 'Business';
     if (text.includes('sport') || text.includes('baseball')) return 'Sports';
-    if (text.includes('women') || text.includes('ladies')) return 'Women\'s Stories';
+    if (text.includes('women') || text.includes('ladies')) return "Women's Stories";
     if (text.includes('protest') || text.includes('strike')) return 'Protests & Reform';
     if (text.includes('school') || text.includes('education')) return 'Education';
     if (text.includes('theater') || text.includes('entertainment')) return 'Entertainment';
     
-    return 'General';
+    return 'General Interest';
   }
 
   private generateDocumentaryAnalysis(article: any, focus?: string): string {
@@ -889,8 +1187,8 @@ export class ClaudeNarrativeService {
       return `The Story of ${characters[0]}: ${originalTitle}`;
     } else if (conflict.includes('murder') || conflict.includes('death')) {
       return `Murder in Atlanta: ${originalTitle}`;
-    } else if (conflict.includes('trial') || conflict.includes('court')) {
-      return `Courtroom Drama: ${originalTitle}`;
+    } else if (conflict.type === 'legal') {
+      return `The ${originalTitle} Trial: Justice in ${year}`;
     } else if (category && year) {
       return `${originalTitle} (${year})`;
     }
@@ -1158,171 +1456,31 @@ export class ClaudeNarrativeService {
   }
 
   /**
-   * CREATE DOCUMENTARY TITLE
+   * Extract basic themes for fallback
    */
-  private createDocumentaryTitle(originalTitle: string, character: string, conflict: any, year: number): string {
-    // Clean up the original title
-    const cleanTitle = originalTitle.replace(/[^\w\s]/g, '').trim();
+  private extractBasicThemes(content: string, year: number): string[] {
+    const themes = [];
+    const text = content.toLowerCase();
     
-    // Create compelling documentary title based on conflict type
-    if (conflict.type === 'life-and-death') {
-      return `Blood and Justice: ${cleanTitle} (${year})`;
-    } else if (conflict.type === 'legal') {
-      return `The ${cleanTitle} Trial: Justice in ${year}`;
-    } else if (conflict.type === 'social') {
-      return `Uprising: ${cleanTitle} and the Fight for Change`;
-    } else if (conflict.type === 'scandal') {
-      return `Behind Closed Doors: The ${cleanTitle} Scandal`;
-    } else if (character && character !== 'Unknown protagonist') {
-      return `${character}: The ${cleanTitle} Story`;
-    } else {
-      return `Untold Atlanta: ${cleanTitle} (${year})`;
-    }
+    if (text.includes('family') || text.includes('personal')) themes.push('Human Interest');
+    if (year >= 1930 && year <= 1940) themes.push('Great Depression');
+    if (year >= 1941 && year <= 1945) themes.push('World War II');
+    if (text.includes('social') || text.includes('community')) themes.push('Social Change');
+    if (text.includes('business') || text.includes('economic')) themes.push('Economic History');
+    
+    return themes.length > 0 ? themes : ['Historical Significance'];
   }
 
   /**
-   * CREATE DOCUMENTARY SUMMARY
+   * Basic content categorization for fallback
    */
-  private createDocumentarySummary(content: string, character: string, conflict: any, stakes: any, year: number): string {
-    const sentences = content.split('.').filter(s => s.trim().length > 20);
-    const firstSentence = sentences[0] || content.substring(0, 100);
-    
-    let summary = `In ${year}, ${firstSentence.trim()}.`;
-    
-    if (character && character !== 'Unknown protagonist') {
-      summary += ` Following ${character} through this ${conflict.type} conflict, `;
-    } else {
-      summary += ` This ${conflict.type} story reveals `;
-    }
-    
-    summary += `the ${stakes.description} that defined a pivotal moment in Atlanta's history.`;
-    
-    if (conflict.elements.length > 0) {
-      summary += ` Featuring ${conflict.elements.join(', ')}, this documentary explores `;
-      summary += `the human cost of ${stakes.level === 'critical' ? 'life-changing' : 'significant'} decisions `;
-      summary += `during a transformative period in the American South.`;
-    }
-    
-    return summary.length > 500 ? summary.substring(0, 497) + '...' : summary;
-  }
-
-  /**
-   * CALCULATE DOCUMENTARY SCORE (VERSION 2)
-   */
-  private calculateDocumentaryScore2(content: string, conflict: any, characters: string[], visualElements: string[], year: number): number {
-    let score = 50; // Base score
-    
-    // Content quality
-    if (content.length > 500) score += 10;
-    if (content.length > 1000) score += 10;
-    
-    // Character strength
-    score += Math.min(characters.length * 8, 20);
-    
-    // Conflict drama
-    if (conflict.type === 'life-and-death') score += 20;
-    else if (conflict.type === 'scandal') score += 15;
-    else if (conflict.type === 'legal') score += 12;
-    else if (conflict.type === 'social') score += 10;
-    
-    // Visual potential
-    score += Math.min(visualElements.length * 5, 15);
-    
-    // Historical significance
-    if (year >= 1929 && year <= 1939) score += 8; // Depression era
-    if (year >= 1940 && year <= 1945) score += 12; // WWII era
-    if (year >= 1950 && year <= 1961) score += 6; // Civil rights era
-    
-    // Dramatic elements
-    score += Math.min(conflict.elements.length * 3, 12);
-    
-    return Math.min(Math.max(score, 30), 100);
-  }
-
-  /**
-   * CATEGORIZE STORY
-   */
-  private categorizeStory(content: string, title: string): string {
+  private categorizeFromContent(content: string, title: string): string {
     const text = (content + ' ' + title).toLowerCase();
-    
-    if (text.includes('murder') || text.includes('crime') || text.includes('trial')) {
-      return 'Crime & Justice';
-    }
-    if (text.includes('war') || text.includes('military') || text.includes('soldier')) {
-      return 'War & Military';
-    }
-    if (text.includes('women') || text.includes('suffrage') || text.includes('ladies')) {
-      return 'Women\'s Stories';
-    }
-    if (text.includes('business') || text.includes('economic') || text.includes('financial')) {
-      return 'Business & Economy';
-    }
-    if (text.includes('politics') || text.includes('election') || text.includes('governor')) {
-      return 'Politics';
-    }
-    if (text.includes('strike') || text.includes('protest') || text.includes('union')) {
-      return 'Protests & Reform';
-    }
-    if (text.includes('school') || text.includes('education') || text.includes('university')) {
-      return 'Education';
-    }
-    if (text.includes('entertainment') || text.includes('theater') || text.includes('music')) {
-      return 'Entertainment';
-    }
-    
+    if (text.includes('baseball') || text.includes('football') || text.includes('game')) return 'Sports';
+    if (text.includes('war') || text.includes('military') || text.includes('soldier')) return 'War & Military';
+    if (text.includes('women') || text.includes('ladies') || text.includes('wife')) return "Women's Stories";
+    if (text.includes('politics') || text.includes('election') || text.includes('governor')) return 'Politics';
+    if (text.includes('crime') || text.includes('trial') || text.includes('murder')) return 'Crime & Justice';
     return 'General Interest';
-  }
-
-  /**
-   * EXTRACT THEMES
-   */
-  private extractThemes(content: string, year: number): string[] {
-    const themes: string[] = [];
-    const lowerContent = content.toLowerCase();
-    
-    // Social themes
-    if (lowerContent.includes('justice') || lowerContent.includes('rights')) themes.push('Social Justice');
-    if (lowerContent.includes('family') || lowerContent.includes('marriage')) themes.push('Family');
-    if (lowerContent.includes('power') || lowerContent.includes('authority')) themes.push('Power & Authority');
-    if (lowerContent.includes('money') || lowerContent.includes('wealth')) themes.push('Economic Inequality');
-    if (lowerContent.includes('race') || lowerContent.includes('segregation')) themes.push('Race Relations');
-    if (lowerContent.includes('change') || lowerContent.includes('progress')) themes.push('Social Change');
-    if (lowerContent.includes('tradition') || lowerContent.includes('heritage')) themes.push('Tradition vs Progress');
-    
-    // Historical context themes
-    if (year >= 1929 && year <= 1939) themes.push('Great Depression Era');
-    if (year >= 1940 && year <= 1945) themes.push('World War II Impact');
-    if (year >= 1950 && year <= 1961) themes.push('Civil Rights Movement');
-    
-    return themes.length > 0 ? themes : ['Historical Drama'];
-  }
-
-  /**
-   * GET VIABILITY REASONS
-   */
-  private getViabilityReasons(characters: string[], conflict: any, visualElements: string[], year: number): string[] {
-    const reasons: string[] = [];
-    
-    if (characters.length > 0) {
-      reasons.push(`Strong character focus with ${characters.length} identified individuals`);
-    }
-    
-    if (conflict.elements.length > 2) {
-      reasons.push(`Multiple dramatic elements including ${conflict.elements.slice(0, 2).join(' and ')}`);
-    }
-    
-    if (visualElements.length > 0) {
-      reasons.push(`Rich archival potential with ${visualElements.join(', ')}`);
-    }
-    
-    if (year >= 1940 && year <= 1945) {
-      reasons.push('WWII-era significance adds historical weight');
-    }
-    
-    if (conflict.type === 'life-and-death') {
-      reasons.push('Life-and-death stakes create compelling narrative tension');
-    }
-    
-    return reasons.length > 0 ? reasons : ['Historical significance and archival value'];
   }
 } 

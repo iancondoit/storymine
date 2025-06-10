@@ -97,50 +97,54 @@ class ClaudeService {
     // Update dataset info from database on initialization
     this.updateDatasetInfo();
     
-    this.DEFAULT_SYSTEM_PROMPT = `You are Jordi, a specialized historical AI assistant for StoryMine, a documentary story discovery platform.
+    this.DEFAULT_SYSTEM_PROMPT = `You are Jordi, a specialized documentary story discovery assistant for StoryMine, working with historical Atlanta Constitution newspaper archives from 1920-1961.
 
 MISSION:
-You are an archival intelligence specialist helping users discover compelling historical stories with documentary potential from the StoryMap Intelligence database.
+You help documentary filmmakers and researchers discover compelling historical narratives from 282,388+ pre-analyzed articles with documentary potential scoring.
 
-CRITICAL INSTRUCTION: When provided with specific articles and entities in the context, you MUST reference and use them directly. Do not say "likely contains" or make assumptions - use the actual data provided.
+CRITICAL ANALYSIS APPROACH:
+When provided with articles and entities, you MUST analyze them as a professional documentary researcher:
 
-CURRENT DATABASE ACCESS:
-- Full access to 282,388+ historical articles (1920-1961) with comprehensive search capabilities
-- 1,061,535+ historical entities with relationship networks
-- 1,219,127+ documented relationships between entities
-- Advanced documentary potential scoring system
+1. **Evaluate Documentary Potential**: Look for human stories, turning points, conflicts, secrets revealed, triumph/tragedy
+2. **Identify Narrative Threads**: Find character arcs, story progressions, dramatic tension
+3. **Assess Archival Value**: Note mentions of photographs, documents, witnesses, interviews
+4. **Suggest Production Angles**: Recommend documentary treatments, interview strategies, research directions
 
-YOUR RESPONSE APPROACH:
-1. ALWAYS check the context for "RELEVANT HISTORICAL ARTICLES FOUND" and "RELEVANT HISTORICAL ENTITIES"
-2. When articles are provided, reference them specifically: "I found X articles including..."
-3. Quote or summarize content from the specific articles provided
-4. Use documentary scores to highlight the most promising stories
-5. Never say "likely contains" - say "the search found" or "the articles show"
+YOUR ANALYTICAL FRAMEWORK:
 
-YOUR CAPABILITIES:
-- Search and analyze historical articles with enhanced keyword and conceptual matching
-- Identify narrative threads through entity relationship networks
-- Map connections between historical figures, organizations, and events
-- Provide historical context using both article content and entity data
-- Assess stories for documentary potential using sophisticated scoring algorithms
-- Generate story leads and research directions from primary sources
+**High Documentary Potential (80-100%):**
+- Personal transformation stories with clear character arcs
+- Previously unknown or secret historical events
+- Stories with living witnesses or rich archival materials
+- Historical turning points with dramatic tension
+- Injustice/triumph narratives with emotional resonance
 
-YOUR CHARACTER:
-- Knowledgeable historical researcher with documentary expertise
-- Warm and engaging, but academically rigorous
-- Passionate about uncovering stories through comprehensive database analysis
-- Always reference specific findings from the database
-- Highlight the documentary potential of historical narratives
+**Medium Documentary Potential (50-79%):**
+- Important historical events with good documentation
+- Interesting characters but limited archival material
+- Community stories with broader significance
+- Business/political stories with human elements
 
-RESPONSE STYLE:
-- Start responses with specific findings: "I found 15 articles about..." or "The search revealed..."
-- Use specific article titles, dates, and content when provided
-- Highlight documentary scores and explain their significance
-- Suggest documentary angles based on actual article content
-- Be conversational but evidence-based
-- Provide concrete citations from the StoryMap Intelligence database
+**Lower Documentary Potential (20-49%):**
+- Routine news events without unique angles
+- Stories lacking visual storytelling possibilities
+- Limited character development or dramatic arc
 
-When users ask questions, use the specific articles and entities provided in the context to give evidence-based responses about historical events and documentary potential.`;
+RESPONSE STRUCTURE:
+1. **Story Assessment**: Start with the most compelling documentary opportunities
+2. **Character Analysis**: Identify key figures and their roles in the narrative
+3. **Historical Context**: Explain why this matters for understanding the era
+4. **Production Recommendations**: Suggest specific documentary approaches
+5. **Research Directions**: Recommend follow-up research and archival exploration
+
+DOCUMENTARY PERSPECTIVE:
+- Think like a documentary producer evaluating stories for film potential
+- Prioritize human interest over pure historical significance
+- Look for visual storytelling opportunities
+- Consider modern audience appeal and relevance
+- Suggest narrative structures and interview opportunities
+
+When users ask questions, provide evidence-based insights that help them understand both the historical significance and documentary potential of the material.`;
 
     this.DATASET_INFO = this.generateDatasetInfo();
   }
@@ -206,61 +210,77 @@ When users ask questions, use the specific articles and entities provided in the
   }
 
   /**
-   * Format context for Jordi
+   * Format context data for Jordi's analysis
    */
   private formatContextForJordi(context: any): string {
     let formattedContext = '';
     
-    // Add database stats if available
+    // Add database statistics
     if (context.databaseStats) {
-      const stats = context.databaseStats;
       formattedContext += `## STORYMAP INTELLIGENCE DATABASE STATUS:\n`;
-      formattedContext += `- Articles: ${stats.articles} (${stats.earliest_year}-${stats.latest_year})\n`;
-      formattedContext += `- Entities: ${stats.entities}\n`;
-      formattedContext += `- Relationships: ${stats.relationships}\n\n`;
+      formattedContext += `Total Articles: ${context.databaseStats.articles}\n`;
+      formattedContext += `Total Entities: ${context.databaseStats.entities}\n`;
+      formattedContext += `Historical Period: ${context.databaseStats.earliest_year}-${context.databaseStats.latest_year}\n`;
+      formattedContext += `Search Query: "${context.query}"\n\n`;
     }
     
-    // Add articles if available
+    // Add articles with enhanced formatting
     if (context.articles && context.articles.length > 0) {
-      formattedContext += '## RELEVANT HISTORICAL ARTICLES FOUND:\n\n';
+      formattedContext += `## DOCUMENTARY-READY ARTICLES FOUND (${context.articles.length} articles):\n\n`;
       
       context.articles.forEach((article: any, index: number) => {
-        formattedContext += `### ARTICLE ${index + 1}: ${article.title || 'Untitled'}\n`;
-        formattedContext += `Date: ${article.publication_date || 'Unknown date'}\n`;
-        formattedContext += `Source: ${article.publication_name || 'Unknown source'}\n`;
-        formattedContext += `Content: ${article.content ? article.content.substring(0, 500) + '...' : 'No content available'}\n`;
-        if (article.documentaryScore) {
-          formattedContext += `Documentary Potential Score: ${article.documentaryScore}/10\n`;
+        const score = article.documentaryScore || article.documentary_potential || 50;
+        const year = article.publication_date ? new Date(article.publication_date).getFullYear() : 'Unknown';
+        
+        formattedContext += `### Article ${index + 1}: ${article.title}\n`;
+        formattedContext += `**Year:** ${year} | **Documentary Score:** ${score}/100\n`;
+        formattedContext += `**Content Length:** ${article.content_length || (article.content?.length || 0)} characters\n`;
+        
+        // Include cleaned content summary
+        if (article.content_summary) {
+          formattedContext += `**Story Summary:** ${article.content_summary}\n`;
+        } else if (article.content && article.content.length > 200) {
+          // Clean and summarize content on the fly
+          const cleanContent = this.cleanContent(article.content);
+          const summary = cleanContent.substring(0, 400) + (cleanContent.length > 400 ? '...' : '');
+          formattedContext += `**Story Content:** ${summary}\n`;
         }
-        formattedContext += '\n';
+        
+        formattedContext += '\n---\n\n';
       });
     }
     
-    // Add entities if available
+    // Add entities with better categorization
     if (context.entities && context.entities.length > 0) {
-      formattedContext += '## RELEVANT HISTORICAL ENTITIES:\n\n';
+      formattedContext += `## HISTORICAL ENTITIES DISCOVERED (${context.entities.length} entities):\n\n`;
       
-      context.entities.forEach((entity: any, index: number) => {
-        formattedContext += `### ENTITY ${index + 1}: ${entity.canonical_name || 'Unnamed'}\n`;
-        formattedContext += `Type: ${entity.entity_type || 'Unknown type'}\n`;
-        
-        // Add entity creation date (when first mentioned)
-        if (entity.created_at) {
-          const dateStr = new Date(entity.created_at).toLocaleDateString();
-          formattedContext += `First recorded in database: ${dateStr}\n`;
-        }
-        
-        // Add significance if this was a person vs organization vs location
-        if (entity.entity_type === 'PERSON') {
-          formattedContext += `Role: Historical figure with documented presence in archives\n`;
-        } else if (entity.entity_type === 'ORG') {
-          formattedContext += `Role: Organization with historical significance\n`;
-        } else if (entity.entity_type === 'GPE') {
-          formattedContext += `Role: Geographic/political entity with historical importance\n`;
-        }
-        
-        formattedContext += '\n';
-      });
+      // Group entities by type for better analysis
+      const entityGroups = {
+        PERSON: context.entities.filter((e: any) => e.entity_type === 'PERSON'),
+        ORG: context.entities.filter((e: any) => e.entity_type === 'ORG'),
+        GPE: context.entities.filter((e: any) => e.entity_type === 'GPE'),
+        OTHER: context.entities.filter((e: any) => !['PERSON', 'ORG', 'GPE'].includes(e.entity_type))
+      };
+      
+      if (entityGroups.PERSON.length > 0) {
+        formattedContext += `**Key Historical Figures (${entityGroups.PERSON.length}):** `;
+        formattedContext += entityGroups.PERSON.map((e: any) => e.canonical_name).join(', ') + '\n\n';
+      }
+      
+      if (entityGroups.ORG.length > 0) {
+        formattedContext += `**Organizations & Institutions (${entityGroups.ORG.length}):** `;
+        formattedContext += entityGroups.ORG.map((e: any) => e.canonical_name).join(', ') + '\n\n';
+      }
+      
+      if (entityGroups.GPE.length > 0) {
+        formattedContext += `**Places & Locations (${entityGroups.GPE.length}):** `;
+        formattedContext += entityGroups.GPE.map((e: any) => e.canonical_name).join(', ') + '\n\n';
+      }
+      
+      if (entityGroups.OTHER.length > 0) {
+        formattedContext += `**Other Entities (${entityGroups.OTHER.length}):** `;
+        formattedContext += entityGroups.OTHER.map((e: any) => e.canonical_name).join(', ') + '\n\n';
+      }
     }
     
     // Add timeline if available
@@ -273,19 +293,37 @@ When users ask questions, use the specific articles and entities provided in the
       });
     }
     
-    // Add query analysis results
-    if (context.queryType) {
-      formattedContext += `## SEARCH RESULTS SUMMARY:\n`;
-      formattedContext += `Query type: ${context.queryType}\n`;
-      formattedContext += `Articles found: ${context.articles?.length || 0}\n`;
-      formattedContext += `Entities found: ${context.entities?.length || 0}\n`;
-      if (context.articles?.length > 0) {
-        formattedContext += `Search status: Full access to StoryMap Intelligence database operational\n`;
-      }
-      formattedContext += '\n';
-    }
+    // Add analysis guidance
+    formattedContext += `## ANALYSIS INSTRUCTIONS:\n`;
+    formattedContext += `Please analyze these ${context.articles?.length || 0} articles for documentary potential. `;
+    formattedContext += `Focus on identifying compelling human stories, dramatic narrative arcs, and production opportunities. `;
+    formattedContext += `Use the documentary scoring as a starting point, but provide your own assessment of which stories `;
+    formattedContext += `would make the most engaging documentaries for modern audiences.\n\n`;
     
     return formattedContext;
+  }
+  
+  /**
+   * Clean content for better Claude analysis
+   */
+  private cleanContent(content: string): string {
+    if (!content) return '';
+    
+    return content
+      // Remove common OCR artifacts
+      .replace(/[€£¢]/g, 'e')
+      .replace(/[àáâãäå]/g, 'a')
+      .replace(/[èéêë]/g, 'e')
+      .replace(/[ìíîï]/g, 'i')
+      .replace(/[òóôõö]/g, 'o')
+      .replace(/[ùúûü]/g, 'u')
+      // Remove page markers and headers
+      .replace(/PAGE \w+/gi, '')
+      .replace(/THE CONSTITUTION, ATLANTA, GA[.,]*/gi, '')
+      .replace(/THE SOUTH'S STANDARD NEWSPAPER/gi, '')
+      // Clean up whitespace
+      .replace(/\s+/g, ' ')
+      .trim();
   }
   
   /**
