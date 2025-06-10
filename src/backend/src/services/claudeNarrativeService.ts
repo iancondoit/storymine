@@ -48,22 +48,22 @@ export class ClaudeNarrativeService {
    * Uses documentary_potential (0-1.0), narrative_score, primary_themes
    */
   private async getIntelligentStoryOptions(category: string, yearRange: string, count: number) {
-    let whereClause = 'WHERE documentary_potential > 0.02'; // Filter for meaningful documentary potential
-    let orderBy = 'documentary_potential DESC, narrative_score DESC';
-    const params: any[] = [count];
+    let whereClause = 'WHERE 1=1'; // Start with basic filter
+    let orderBy = 'RANDOM()'; // Get variety of stories
+    const params: any[] = [count * 5]; // Get more articles to analyze
 
-    // Category filtering using primary_themes and content
+    // Category filtering using primary_themes first
     if (category !== 'general') {
       const categoryMap: Record<string, string> = {
-        'politics': "primary_themes @> '[\"Politics\"]' OR content ILIKE '%politics%' OR content ILIKE '%election%' OR content ILIKE '%government%'",
-        'crime': "primary_themes @> '[\"Crime\"]' OR content ILIKE '%crime%' OR content ILIKE '%murder%' OR content ILIKE '%trial%'",
-        'war': "primary_themes @> '[\"War\"]' OR content ILIKE '%war%' OR content ILIKE '%military%' OR content ILIKE '%battle%'",
-        'business': "primary_themes @> '[\"Business\"]' OR content ILIKE '%business%' OR content ILIKE '%economy%' OR content ILIKE '%financial%'",
-        'sports': "primary_themes @> '[\"Sports\"]' OR content ILIKE '%sports%' OR content ILIKE '%baseball%' OR content ILIKE '%football%'",
-        'women': "primary_themes @> '[\"Women\"]' OR content ILIKE '%women%' OR content ILIKE '%ladies%' OR content ILIKE '%suffrage%'",
-        'protests': "primary_themes @> '[\"Social Reform\"]' OR content ILIKE '%protest%' OR content ILIKE '%strike%' OR content ILIKE '%demonstration%'",
-        'education': "primary_themes @> '[\"Education\"]' OR content ILIKE '%school%' OR content ILIKE '%education%' OR content ILIKE '%university%'",
-        'entertainment': "primary_themes @> '[\"Entertainment\"]' OR content ILIKE '%theater%' OR content ILIKE '%music%' OR content ILIKE '%entertainment%'"
+        'politics': "primary_themes::text ILIKE '%politics%' OR title ILIKE '%election%' OR title ILIKE '%governor%' OR title ILIKE '%mayor%'",
+        'crime': "primary_themes::text ILIKE '%crime%' OR title ILIKE '%murder%' OR title ILIKE '%trial%' OR title ILIKE '%arrest%'",
+        'war': "primary_themes::text ILIKE '%war%' OR title ILIKE '%military%' OR title ILIKE '%soldier%' OR title ILIKE '%battle%'",
+        'business': "primary_themes::text ILIKE '%business%' OR title ILIKE '%company%' OR title ILIKE '%bank%' OR title ILIKE '%economic%'",
+        'sports': "primary_themes::text ILIKE '%sports%' OR title ILIKE '%baseball%' OR title ILIKE '%football%' OR title ILIKE '%game%'",
+        'women': "primary_themes::text ILIKE '%women%' OR title ILIKE '%women%' OR title ILIKE '%ladies%' OR title ILIKE '%wife%'",
+        'protests': "primary_themes::text ILIKE '%protest%' OR title ILIKE '%strike%' OR title ILIKE '%demonstration%' OR title ILIKE '%union%'",
+        'education': "primary_themes::text ILIKE '%education%' OR title ILIKE '%school%' OR title ILIKE '%university%' OR title ILIKE '%college%'",
+        'entertainment': "primary_themes::text ILIKE '%entertainment%' OR title ILIKE '%theater%' OR title ILIKE '%music%' OR title ILIKE '%show%'"
       };
 
       if (categoryMap[category]) {
@@ -91,12 +91,14 @@ export class ClaudeNarrativeService {
       }
     }
 
+    // Simple query to get actual articles with content
     const queryText = `
       SELECT 
         id,
         storymap_id,
         title,
         content,
+        processed_content,
         publication_date,
         documentary_potential,
         narrative_score,
@@ -105,20 +107,160 @@ export class ClaudeNarrativeService {
         evidence_quality
       FROM intelligence_articles
       ${whereClause}
+      AND (content IS NOT NULL AND length(content) > 100)
       ORDER BY ${orderBy}
       LIMIT $1
     `;
 
-    const result = await query(queryText, params);
+    console.log('🎬 Querying articles for documentary story analysis...');
+    
+    try {
+      const result = await query(queryText, params);
+      console.log(`✅ Found ${result.rows.length} articles to analyze`);
+      
+      if (result.rows.length === 0) {
+        console.log('❌ No articles found with content, using fallback...');
+        return await this.getLegacyStoryOptions(category, count);
+      }
+      
+      // Analyze the articles and generate compelling documentary stories
+      const stories = await this.generateDocumentaryStoriesFromArticles(result.rows, count);
+      
+      return {
+        success: true,
+        stories: stories,
+        metadata: {
+          source: 'article_analysis',
+          category,
+          yearRange,
+          totalFound: result.rows.length,
+          analyzed: stories.length
+        }
+      };
+    } catch (error) {
+      console.log('💡 Article query failed, using fallback...', error);
+      return await this.getLegacyStoryOptions(category, count);
+    }
+  }
+
+  /**
+   * GENERATE DOCUMENTARY STORIES FROM ARTICLES
+   * This is the key method that analyzes article content and creates compelling stories
+   * just like I did manually when analyzing 50 articles
+   */
+  private async generateDocumentaryStoriesFromArticles(articles: any[], count: number): Promise<any[]> {
+    console.log(`🎭 Analyzing ${articles.length} articles for documentary potential...`);
+    
+    const documentaryStories = [];
+    
+    for (const article of articles.slice(0, count)) {
+      try {
+        const story = await this.analyzeArticleForDocumentaryStory(article);
+        if (story) {
+          documentaryStories.push(story);
+        }
+      } catch (error) {
+        console.log(`Error analyzing article ${article.id}:`, error);
+      }
+    }
+    
+    // Sort by documentary potential
+    documentaryStories.sort((a, b) => b.documentaryPotential - a.documentaryPotential);
+    
+    console.log(`🏆 Generated ${documentaryStories.length} compelling documentary stories`);
+    return documentaryStories;
+  }
+
+  /**
+   * ANALYZE SINGLE ARTICLE FOR DOCUMENTARY STORY
+   * Apply the same analysis I did manually to identify compelling narrative elements
+   */
+  private async analyzeArticleForDocumentaryStory(article: any): Promise<any | null> {
+    const content = article.content || article.processed_content || '';
+    const title = article.title || 'Untitled Story';
+    
+    if (!content || content.length < 100) {
+      return null; // Skip articles without substantial content
+    }
+    
+    const year = new Date(article.publication_date).getFullYear();
+    
+    // Extract documentary elements like I did manually
+    const documentaryElements = this.extractDocumentaryElements(content, title, year);
+    
+    // Only return stories with strong documentary potential
+    if (documentaryElements.score < 60) {
+      return null;
+    }
     
     return {
-      success: true,
-      stories: result.rows.map((article: any) => this.transformToDocumentaryStory(article)),
-      metadata: {
-        source: 'intelligence',
-        category,
-        yearRange,
-        totalFound: result.rows.length
+      id: article.storymap_id || `atlanta-story-${article.id}`,
+      title: documentaryElements.enhancedTitle,
+      summary: documentaryElements.documentarySummary,
+      year: year,
+      category: documentaryElements.category,
+      documentaryPotential: documentaryElements.score,
+      narrativeScore: Math.round((article.narrative_score || 0.7) * 100),
+      archivalRichness: Math.round((article.archival_richness || 0.6) * 100),
+      evidenceQuality: Math.round((article.evidence_quality || 0.65) * 100),
+      themes: documentaryElements.themes,
+      storyElements: documentaryElements.storyElements,
+      publicationDate: article.publication_date,
+      historicalContext: this.getHistoricalContext(year),
+      documentaryViability: documentaryElements.viability
+    };
+  }
+
+  /**
+   * EXTRACT DOCUMENTARY ELEMENTS
+   * Apply the same analytical approach I used when manually analyzing articles
+   */
+  private extractDocumentaryElements(content: string, title: string, year: number): any {
+    // Character analysis
+    const characters = this.extractCharacters(content);
+    const primaryCharacter = characters[0] || 'Unknown protagonist';
+    
+    // Conflict and drama analysis
+    const conflict = this.analyzeConflictAndDrama(content);
+    
+    // Stakes and significance
+    const stakes = this.identifyStakes(content, year);
+    
+    // Visual and archival potential
+    const visualElements = this.identifyVisualElements(content, title);
+    
+    // Generate compelling documentary title
+    const enhancedTitle = this.createDocumentaryTitle(title, primaryCharacter, conflict, year);
+    
+    // Generate documentary-style summary
+    const documentarySummary = this.createDocumentarySummary(content, primaryCharacter, conflict, stakes, year);
+    
+    // Calculate documentary score
+    const score = this.calculateDocumentaryScore2(content, conflict, characters, visualElements, year);
+    
+    // Categorize the story
+    const category = this.categorizeStory(content, title);
+    
+    // Extract themes
+    const themes = this.extractThemes(content, year);
+    
+    return {
+      enhancedTitle,
+      documentarySummary,
+      score,
+      category,
+      themes,
+      storyElements: {
+        primaryCharacter,
+        conflict: conflict.type,
+        stakes: stakes.description,
+        visualElements,
+        dramaticElements: conflict.elements
+      },
+      viability: {
+        score: score,
+        level: score >= 80 ? 'High' : score >= 60 ? 'Moderate' : 'Developing',
+        reasons: this.getViabilityReasons(characters, conflict, visualElements, year)
       }
     };
   }
@@ -818,6 +960,211 @@ export class ClaudeNarrativeService {
       hasPhotos: !!hasPhotos,
       hasDocuments: !!hasDocuments,
       hasTestimony: !!hasTestimony
+    };
+  }
+
+  /**
+   * GENERATE ENTITY-BASED STORIES: Create compelling stories from entity relationships
+   * This method generates the incredible documentary story ideas using the rich
+   * StoryMap Intelligence entity and relationship data
+   */
+  private async generateEntityBasedStories(category: string, yearRange: string, count: number) {
+    console.log('🎭 Generating stories from entity relationships and dramatic tensions...');
+    
+    // Build entity query based on category and year range
+    let entityWhereClause = 'WHERE e.documentary_potential > 0.3';
+    let relationshipWhereClause = 'WHERE r.dramatic_tension > 0.4';
+    const params: any[] = [Math.min(count * 2, 100)]; // Get more entities than needed for variety
+
+    // Category-specific entity filtering
+    if (category !== 'general') {
+      const categoryEntityTypes: Record<string, string> = {
+        'politics': "e.entity_type IN ('person', 'organization') AND (e.canonical_name ILIKE '%governor%' OR e.canonical_name ILIKE '%mayor%' OR e.canonical_name ILIKE '%senator%' OR e.thematic_tags::text ILIKE '%politics%')",
+        'crime': "e.entity_type IN ('person', 'event') AND (e.thematic_tags::text ILIKE '%crime%' OR e.canonical_name ILIKE '%murder%' OR e.canonical_name ILIKE '%trial%')",
+        'war': "e.entity_type IN ('person', 'organization', 'event') AND (e.thematic_tags::text ILIKE '%war%' OR e.canonical_name ILIKE '%military%' OR e.canonical_name ILIKE '%battle%')",
+        'business': "e.entity_type IN ('person', 'organization') AND (e.thematic_tags::text ILIKE '%business%' OR e.canonical_name ILIKE '%company%' OR e.canonical_name ILIKE '%bank%')", 
+        'sports': "e.entity_type IN ('person', 'organization') AND (e.thematic_tags::text ILIKE '%sports%' OR e.canonical_name ILIKE '%baseball%' OR e.canonical_name ILIKE '%football%')",
+        'women': "e.entity_type IN ('person', 'organization') AND (e.canonical_name ILIKE '%women%' OR e.canonical_name ILIKE '%ladies%' OR e.thematic_tags::text ILIKE '%suffrage%')",
+        'protests': "e.entity_type IN ('person', 'organization', 'event') AND (e.thematic_tags::text ILIKE '%protest%' OR e.canonical_name ILIKE '%strike%' OR e.canonical_name ILIKE '%union%')",
+        'education': "e.entity_type IN ('person', 'organization') AND (e.canonical_name ILIKE '%school%' OR e.canonical_name ILIKE '%university%' OR e.canonical_name ILIKE '%college%')",
+        'entertainment': "e.entity_type IN ('person', 'organization') AND (e.thematic_tags::text ILIKE '%entertainment%' OR e.canonical_name ILIKE '%theater%' OR e.canonical_name ILIKE '%music%')"
+      };
+
+      if (categoryEntityTypes[category]) {
+        entityWhereClause += ` AND (${categoryEntityTypes[category]})`;
+      }
+    }
+
+    // Year range filtering for entities
+    if (yearRange !== 'all') {
+      const yearRanges: Record<string, string[]> = {
+        '1920-1925': ['1920-01-01', '1925-12-31'],
+        '1925-1930': ['1925-01-01', '1930-12-31'],
+        '1930-1935': ['1930-01-01', '1935-12-31'],
+        '1935-1940': ['1935-01-01', '1940-12-31'], 
+        '1940-1945': ['1940-01-01', '1945-12-31'],
+        '1945-1950': ['1945-01-01', '1950-12-31'],
+        '1950-1955': ['1950-01-01', '1955-12-31'],
+        '1955-1961': ['1955-01-01', '1961-12-31']
+      };
+
+      if (yearRanges[yearRange]) {
+        const [startDate, endDate] = yearRanges[yearRange];
+        entityWhereClause += ` AND (e.active_period_start <= $${params.length + 1} AND e.active_period_end >= $${params.length + 2})`;
+        params.push(endDate, startDate);
+      }
+    }
+
+    // MASTER QUERY: Get high-potential entities with their dramatic relationships
+    const entityStoryQuery = `
+      WITH high_potential_entities AS (
+        SELECT 
+          e.id,
+          e.canonical_name,
+          e.entity_type,
+          e.biographical_summary,
+          e.historical_significance_score,
+          e.documentary_potential,
+          e.narrative_importance,
+          e.active_period_start,
+          e.active_period_end,
+          e.thematic_tags,
+          e.primary_location,
+          e.professional_categories
+        FROM intelligence_entities e
+        ${entityWhereClause}
+        ORDER BY e.documentary_potential DESC, e.historical_significance_score DESC
+        LIMIT $1
+      ),
+      dramatic_relationships AS (
+        SELECT 
+          r.source_entity_id,
+          r.target_entity_id,
+          r.relationship_type,
+          r.dramatic_tension,
+          r.narrative_significance,
+          r.human_interest_factor,
+          r.relationship_nature,
+          r.evidence_quotes,
+          r.first_documented,
+          r.last_documented,
+          e1.canonical_name as source_name,
+          e2.canonical_name as target_name,
+          e1.entity_type as source_type,
+          e2.entity_type as target_type
+        FROM intelligence_relationships r
+        JOIN high_potential_entities e1 ON r.source_entity_id = e1.id
+        JOIN high_potential_entities e2 ON r.target_entity_id = e2.id
+        ${relationshipWhereClause}
+        ORDER BY r.dramatic_tension DESC, r.narrative_significance DESC
+      )
+      SELECT 
+        hpe.*,
+        (
+          SELECT json_agg(
+            json_build_object(
+              'target_name', dr.target_name,
+              'target_type', dr.target_type,
+              'relationship_type', dr.relationship_type,
+              'dramatic_tension', dr.dramatic_tension,
+              'narrative_significance', dr.narrative_significance,
+              'human_interest', dr.human_interest_factor,
+              'relationship_nature', dr.relationship_nature,
+              'evidence_quotes', dr.evidence_quotes,
+              'timeframe', dr.first_documented || ' - ' || dr.last_documented
+            )
+          )
+          FROM dramatic_relationships dr 
+          WHERE dr.source_entity_id = hpe.id
+          LIMIT 5
+        ) as key_relationships,
+        (
+          SELECT json_agg(
+            json_build_object(
+              'source_name', dr.source_name,
+              'source_type', dr.source_type,
+              'relationship_type', dr.relationship_type,
+              'dramatic_tension', dr.dramatic_tension,
+              'narrative_significance', dr.narrative_significance
+            )
+          )
+          FROM dramatic_relationships dr 
+          WHERE dr.target_entity_id = hpe.id
+          LIMIT 3
+        ) as incoming_relationships
+      FROM high_potential_entities hpe
+      ORDER BY hpe.documentary_potential DESC
+      LIMIT ${count}
+    `;
+
+    try {
+      const result = await query(entityStoryQuery, params);
+      console.log(`🎪 Generated ${result.rows.length} entity-based stories`);
+      
+      const stories = result.rows.map((entity: any, index: number) => {
+        return this.transformEntityToDocumentaryStory(entity, index + 1);
+      });
+
+      return {
+        success: true,
+        stories: stories,
+        metadata: {
+          source: 'entity_intelligence',
+          category,
+          yearRange,
+          totalFound: result.rows.length,
+          method: 'entity_relationship_analysis'
+        }
+      };
+    } catch (error) {
+      console.error('Entity-based story generation failed:', error);
+      // Final fallback to legacy method
+      return await this.getLegacyStoryOptions(category, count);
+    }
+  }
+
+  /**
+   * TRANSFORM ENTITY TO DOCUMENTARY STORY
+   * Convert entity relationship data into compelling documentary narratives
+   */
+  private transformEntityToDocumentaryStory(entity: any, storyNumber: number): any {
+    const relationships = entity.key_relationships || [];
+    const incomingRels = entity.incoming_relationships || [];
+    const allRelationships = [...relationships, ...incomingRels];
+    
+    // Generate compelling documentary title and summary
+    const storyTitle = this.generateEntityStoryTitle(entity, relationships);
+    const documentarySummary = this.generateEntityStorySummary(entity, allRelationships);
+    const storyElements = this.extractEntityStoryElements(entity, allRelationships);
+    
+    // Calculate documentary metrics
+    const documentaryScore = this.calculateEntityDocumentaryScore(entity, allRelationships);
+    
+    // Determine time period
+    const startYear = entity.active_period_start ? new Date(entity.active_period_start).getFullYear() : 1920;
+    const endYear = entity.active_period_end ? new Date(entity.active_period_end).getFullYear() : 1961;
+    const primaryYear = Math.floor((startYear + endYear) / 2);
+
+    return {
+      id: `entity-story-${entity.id}`,
+      title: storyTitle,
+      summary: documentarySummary,
+      year: primaryYear,
+      yearRange: `${startYear}-${endYear}`,
+      category: this.categorizeEntityStory(entity, allRelationships),
+      documentaryPotential: Math.round(documentaryScore.potential * 100),
+      narrativeScore: Math.round(documentaryScore.narrative * 100),
+      archivalRichness: Math.round((entity.documentary_potential || 0.6) * 100),
+      evidenceQuality: Math.round(documentaryScore.evidence * 100),
+      themes: this.extractEntityThemes(entity, allRelationships),
+      storyElements: storyElements,
+      publicationDate: entity.active_period_start || '1920-01-01',
+      historicalContext: this.getHistoricalContext(primaryYear),
+      documentaryViability: this.assessEntityDocumentaryViability(entity, allRelationships),
+      entityType: entity.entity_type,
+      primaryCharacter: entity.canonical_name,
+      relationshipCount: allRelationships.length,
+      dramaticTension: Math.max(...allRelationships.map((r: any) => r.dramatic_tension || 0), 0)
     };
   }
 } 
