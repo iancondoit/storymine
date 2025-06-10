@@ -102,7 +102,7 @@ const JordiDashboard: React.FC = () => {
     setLoading(true);
     
     try {
-      const response = await fetch('/api/narrative/refresh', {
+      const response = await fetch(`/api/narrative/refresh?t=${Date.now()}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
