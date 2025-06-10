@@ -36,6 +36,7 @@ const JordiDashboard: React.FC = () => {
   const [selectedYearRange, setSelectedYearRange] = useState<string>('all');
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [newStoriesCount, setNewStoriesCount] = useState<number>(0);
 
   // Load initial data
   useEffect(() => {
@@ -83,6 +84,7 @@ const JordiDashboard: React.FC = () => {
       
       if (data.success) {
         setStories(data.data);
+        setNewStoriesCount(0); // Reset when loading fresh stories
       } else {
         setError('Failed to load stories');
         setStories([]);
@@ -115,7 +117,11 @@ const JordiDashboard: React.FC = () => {
       const data = await response.json();
       
       if (data.success) {
-        setStories(data.data);
+        // Add new stories to the top of the existing list
+        setStories(prevStories => [...data.data, ...prevStories]);
+        setNewStoriesCount(data.data.length);
+        // Clear the new stories indicator after a short delay
+        setTimeout(() => setNewStoriesCount(0), 3000);
       } else {
         setError('Failed to refresh stories');
       }
@@ -199,7 +205,7 @@ const JordiDashboard: React.FC = () => {
                 className="btn-primary flex items-center space-x-2 py-3 px-6"
               >
                 <RotateCcw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                <span>{loading ? 'Discovering stories...' : 'Give me more'}</span>
+                <span>{loading ? 'Discovering stories...' : stories.length > 0 ? 'Discover more' : 'Give me more'}</span>
               </button>
             </div>
             
@@ -297,7 +303,12 @@ const JordiDashboard: React.FC = () => {
                     <div>
                       <h2 className="text-2xl font-display font-bold text-dark-900 dark:text-white">Documentary Stories</h2>
                       <p className="text-dark-600 dark:text-dark-300">
-                        {loading ? 'Discovering stories...' : `${stories.length} stories with documentary potential`}
+                        {loading ? 'Discovering stories...' : `${stories.length} stories discovered with documentary potential`}
+                        {newStoriesCount > 0 && (
+                          <span className="ml-3 inline-flex items-center px-2 py-1 rounded-md text-xs bg-accent-100 dark:bg-accent-900/30 text-accent-800 dark:text-accent-400 animate-bounce">
+                            +{newStoriesCount} new
+                          </span>
+                        )}
                       </p>
                     </div>
                   </div>
@@ -327,11 +338,15 @@ const JordiDashboard: React.FC = () => {
                 )}
 
                 <div className="space-y-4">
-                  {stories.map((story) => (
+                  {stories.map((story, index) => (
                     <div
                       key={story.id}
                       onClick={() => openStory(story.id)}
-                      className="bg-white dark:bg-dark-800 border border-dark-200 dark:border-dark-700 rounded-lg p-6 cursor-pointer hover:border-accent-300 dark:hover:border-accent-600 transition-all duration-200 hover:shadow-lg dark:hover:shadow-dark-900/50"
+                      className={`bg-white dark:bg-dark-800 border rounded-lg p-6 cursor-pointer hover:border-accent-300 dark:hover:border-accent-600 transition-all duration-200 hover:shadow-lg dark:hover:shadow-dark-900/50 ${
+                        index < newStoriesCount 
+                          ? 'border-accent-400 dark:border-accent-500 shadow-md animate-pulse bg-accent-50/20 dark:bg-accent-900/10' 
+                          : 'border-dark-200 dark:border-dark-700'
+                      }`}
                     >
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex items-center space-x-3">
