@@ -117,8 +117,13 @@ const JordiDashboard: React.FC = () => {
       const data = await response.json();
       
       if (data.success) {
+        console.log(`🔄 Refresh: Got ${data.data.length} new stories, current total: ${stories.length}`);
         // Add new stories to the top of the existing list
-        setStories(prevStories => [...data.data, ...prevStories]);
+        setStories(prevStories => {
+          const newTotal = [...data.data, ...prevStories];
+          console.log(`📊 After accumulation: ${newTotal.length} total stories`);
+          return newTotal;
+        });
         setNewStoriesCount(data.data.length);
         // Clear the new stories indicator after a short delay
         setTimeout(() => setNewStoriesCount(0), 3000);

@@ -290,11 +290,24 @@ export class ClaudeNarrativeService {
     
     // Sort by documentary potential and return top stories
     const sortedStories = allDocumentaryStories
-      .sort((a, b) => (b.documentaryPotential || 0) - (a.documentaryPotential || 0))
-      .slice(0, targetCount);
+      .sort((a, b) => (b.documentaryPotential || 0) - (a.documentaryPotential || 0));
     
-    console.log(`🎯 Optimized analysis complete: ${sortedStories.length} stories in record time`);
-    return sortedStories;
+    console.log(`🎯 Optimized analysis complete: ${sortedStories.length} total stories, target: ${targetCount}`);
+    
+    // If we don't have enough stories, generate fallback stories to reach target count
+    if (sortedStories.length < targetCount) {
+      console.log(`⚠️ Only ${sortedStories.length} stories generated, need ${targetCount}. Creating fallback stories...`);
+      
+      // Get more articles from the original batch and create fallback stories
+      const stillNeeded = targetCount - sortedStories.length;
+      const extraArticles = articles.slice(sortedStories.length, sortedStories.length + stillNeeded);
+      const fallbackStories = this.generateFallbackStories(extraArticles);
+      
+      sortedStories.push(...fallbackStories);
+      console.log(`✅ Added ${fallbackStories.length} fallback stories. Total: ${sortedStories.length}`);
+    }
+    
+    return sortedStories.slice(0, targetCount);
   }
 
   /**
@@ -310,7 +323,7 @@ export class ClaudeNarrativeService {
       year: article.year
     }));
 
-    const optimizedPrompt = `Documentary expert: Analyze these ${articlesData.length} Atlanta Constitution articles. Return the 3-5 BEST documentary stories.
+    const optimizedPrompt = `Documentary expert: Analyze these ${articlesData.length} Atlanta Constitution articles. Return ALL articles as documentary stories.
 
 ARTICLES:
 ${articlesData.map(a => `${a.index}. "${a.title}" (${a.year})\n${a.preview}...`).join('\n\n')}
@@ -340,7 +353,7 @@ Return JSON (no other text):
        }));
     } catch (error) {
       console.error('❌ Optimized batch failed, using fallback:', error);
-      return this.generateFallbackStories(articles.slice(0, 3));
+      return this.generateFallbackStories(articles.slice(0, Math.min(articles.length, 10)));
     }
   }
 
