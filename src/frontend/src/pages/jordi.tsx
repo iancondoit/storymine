@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
+import { Archive, Clock, Sparkles, Film, RotateCcw } from 'lucide-react';
 
 interface Story {
   id: string;
@@ -147,221 +148,232 @@ const JordiDashboard: React.FC = () => {
   };
 
   const getDocumentaryColor = (potential: number): string => {
-    if (potential >= 80) return 'bg-green-100 text-green-800';
-    if (potential >= 60) return 'bg-yellow-100 text-yellow-800';
-    if (potential >= 40) return 'bg-orange-100 text-orange-800';
-    return 'bg-gray-100 text-gray-800';
+    if (potential >= 90) return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
+    if (potential >= 80) return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400';
+    if (potential >= 60) return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
+    if (potential >= 40) return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400';
+    return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
   };
 
   return (
     <>
       <Head>
-        <title>Jordi - Story Discovery Dashboard | StoryMine</title>
+        <title>Jordi - Documentary Story Discovery | StoryMine</title>
         <meta name="description" content="Discover compelling documentary stories from 282,388 Atlanta Constitution articles (1920-1961)" />
       </Head>
 
-      <div className="min-h-screen bg-gray-50">
+      {/* Scientific grid background - matching home page */}
+      <div className="fixed inset-0 pointer-events-none z-0 opacity-10 dark:opacity-5">
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,theme(colors.dark.900/10)_1px,transparent_1px),linear-gradient(to_bottom,theme(colors.dark.900/10)_1px,transparent_1px)] bg-[size:4rem_4rem] dark:bg-[linear-gradient(to_right,theme(colors.white/10)_1px,transparent_1px),linear-gradient(to_bottom,theme(colors.white/10)_1px,transparent_1px)]"></div>
+        <div className="absolute top-1/2 left-0 right-0 h-px bg-dark-800/20 dark:bg-white/20"></div>
+        <div className="absolute left-1/2 top-0 bottom-0 w-px bg-dark-800/20 dark:bg-white/20"></div>
+      </div>
+
+      <div className="min-h-screen bg-gradient-to-b from-white to-dark-50 dark:from-dark-900 dark:to-dark-800 transition-colors duration-500">
         {/* Header */}
-        <div className="bg-white shadow-sm border-b">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <header className="pt-8 pb-12 relative">
+          <div className="container-base relative z-10">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-3xl font-bold text-gray-900 flex items-center">
+                <h1 className="text-4xl font-display font-bold text-dark-900 dark:text-white flex items-center">
                   🎬 Jordi
-                  <span className="ml-3 text-sm font-normal text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                  <span className="ml-3 text-sm font-normal text-dark-500 dark:text-dark-400 bg-dark-100 dark:bg-dark-700 px-3 py-1 rounded-md">
                     v3.0.0
                   </span>
                 </h1>
-                <p className="mt-1 text-gray-600">
+                <p className="mt-2 text-xl text-dark-600 dark:text-dark-300">
                   Documentary Story Discovery • 282,388 Atlanta Constitution articles (1920-1961)
                 </p>
+                
+                {/* Mathematical formula for effect */}
+                <div className="mt-4 py-2 px-3 bg-dark-50 dark:bg-dark-800/50 rounded-md inline-flex items-center font-mono text-sm text-dark-900 dark:text-dark-200 border border-dark-200 dark:border-dark-700">
+                  <span className="mr-2 text-accent-800 dark:text-accent-600">ƒ(D<sub>p</sub>)</span> = 
+                  <span className="mx-2">∑</span>
+                  <span>N(t) · C(r) · V(s)</span>
+                  <span className="ml-3 text-dark-500 dark:text-dark-400">// documentary potential function</span>
+                </div>
               </div>
               <button
                 onClick={refreshStories}
                 disabled={loading}
-                className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg flex items-center space-x-2"
+                className="btn-primary flex items-center space-x-2 py-3 px-6"
               >
-                <span>🔄</span>
-                <span>{loading ? 'Loading...' : 'Give me more'}</span>
+                <RotateCcw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                <span>{loading ? 'Discovering stories...' : 'Give me more'}</span>
               </button>
             </div>
-          </div>
-        </div>
-
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Filter Controls */}
-          <div className="mb-8 space-y-6">
-            {/* Category Filters */}
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">Story Categories</h3>
-              <div className="flex flex-wrap gap-2">
-                {categories.map((category) => (
-                  <button
-                    key={category.id}
-                    onClick={() => setSelectedCategory(category.id)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      selectedCategory === category.id
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
-                    }`}
-                  >
-                    <span className="mr-2">{getCategoryIcon(category.id)}</span>
-                    {category.name}
-                  </button>
+            
+            {/* Decorative DNA sequence - matching home page */}
+            <div className="absolute top-32 right-10 w-64 h-64 opacity-20 dark:opacity-10 hidden lg:block">
+              <svg viewBox="0 0 100 400" xmlns="http://www.w3.org/2000/svg" className="text-accent-800 dark:text-accent-600">
+                <path d="M30,0 Q60,50 30,100 Q0,150 30,200 Q60,250 30,300 Q0,350 30,400" stroke="currentColor" strokeWidth="2" fill="none" />
+                <path d="M70,0 Q40,50 70,100 Q100,150 70,200 Q40,250 70,300 Q100,350 70,400" stroke="currentColor" strokeWidth="2" fill="none" />
+                
+                {/* DNA "rungs" */}
+                {[0, 25, 50, 75, 100, 125, 150, 175, 200, 225, 250, 275, 300, 325, 350, 375].map((y) => (
+                  <line key={y} x1="30" y1={y} x2="70" y2={y} stroke="currentColor" strokeWidth="1.5" />
                 ))}
-              </div>
-            </div>
-
-            {/* Year Range Filters */}
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">Time Periods</h3>
-              <div className="flex flex-wrap gap-2">
-                {yearRanges.map((range) => (
-                  <button
-                    key={range.id}
-                    onClick={() => setSelectedYearRange(range.id)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      selectedYearRange === range.id
-                        ? 'bg-green-600 text-white'
-                        : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
-                    }`}
-                  >
-                    {range.name}
-                    {range.count && (
-                      <span className="ml-1 text-xs opacity-75">({range.count})</span>
-                    )}
-                  </button>
+                
+                {/* Story symbols instead of base pairs */}
+                {[12, 37, 62, 87, 112, 137, 162, 187, 212, 237, 262, 287, 312, 337, 362, 387].map((y, i) => (
+                  <text key={y} x="45" y={y} fontSize="8" textAnchor="middle" fill="currentColor">
+                    {['S', 'T', 'O', 'R', 'Y', 'M', 'I', 'N', 'E', 'J', 'O', 'R', 'D', 'I', 'A', 'I'][i]}
+                  </text>
                 ))}
-              </div>
+              </svg>
             </div>
           </div>
+        </header>
 
-          {/* Active Filters Display */}
-          {(selectedCategory !== 'general' || selectedYearRange !== 'all') && (
-            <div className="mb-6 flex items-center space-x-4 text-sm text-gray-600">
-              <span>Active filters:</span>
-              {selectedCategory !== 'general' && (
-                <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                  {categories.find(c => c.id === selectedCategory)?.name}
-                </span>
-              )}
-              {selectedYearRange !== 'all' && (
-                <span className="bg-green-100 text-green-800 px-2 py-1 rounded">
-                  {yearRanges.find(r => r.id === selectedYearRange)?.name}
-                </span>
-              )}
-              <button
-                onClick={() => {
-                  setSelectedCategory('general');
-                  setSelectedYearRange('all');
-                }}
-                className="text-blue-600 hover:text-blue-800 underline"
-              >
-                Clear filters
-              </button>
-            </div>
-          )}
-
-          {/* Error Display */}
-          {error && (
-            <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
-              <div className="flex items-center">
-                <span className="text-red-600 mr-2">⚠️</span>
-                <span className="text-red-800">{error}</span>
-                <button
-                  onClick={loadStories}
-                  className="ml-auto text-red-600 hover:text-red-800 underline"
-                >
-                  Retry
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Loading State */}
-          {loading && (
-            <div className="text-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-              <p className="mt-4 text-gray-600">Discovering stories...</p>
-            </div>
-          )}
-
-          {/* Stories Grid */}
-          {!loading && stories.length > 0 && (
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {stories.map((story) => (
-                <div
-                  key={story.id}
-                  onClick={() => openStory(story.id)}
-                  className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 cursor-pointer hover:shadow-md transition-shadow"
-                >
-                  {/* Story Header */}
-                  <div className="flex items-start justify-between mb-3">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                      {story.year}
-                    </span>
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getDocumentaryColor(story.documentaryPotential)}`}>
-                      {story.documentaryPotential}% potential
-                    </span>
+        <main className="pb-24">
+          <div className="container-base">
+            {/* Filter Controls */}
+            <div className="mb-8 space-y-6">
+              {/* Category Filters */}
+              <div className="card p-6 border border-dark-100 dark:border-dark-700">
+                <div className="flex items-center mb-4">
+                  <div className="w-10 h-10 rounded-lg bg-accent-100 dark:bg-dark-700 flex items-center justify-center text-accent-900 dark:text-accent-600 mr-3">
+                    <Archive className="w-5 h-5" />
                   </div>
-
-                  {/* Story Content */}
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
-                    {story.title}
-                  </h3>
-                  <p className="text-gray-600 text-sm mb-4 line-clamp-3">
-                    {story.summary}
-                  </p>
-
-                  {/* Story Metadata */}
-                  <div className="flex items-center justify-between text-xs text-gray-500">
-                    <span className="flex items-center">
-                      {getCategoryIcon(selectedCategory)}
-                      <span className="ml-1">{story.category}</span>
-                    </span>
-                    {story.narrativeScore && (
-                      <span>Narrative: {story.narrativeScore}%</span>
-                    )}
-                  </div>
-
-                  {/* Themes */}
-                  {story.themes && story.themes.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-1">
-                      {story.themes.slice(0, 3).map((theme, index) => (
-                        <span
-                          key={index}
-                          className="inline-block bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded"
-                        >
-                          {theme}
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                  <h3 className="text-lg font-display font-semibold text-dark-900 dark:text-white">Story Categories</h3>
                 </div>
-              ))}
-            </div>
-          )}
+                <div className="flex flex-wrap gap-2">
+                  {categories.map((category) => (
+                    <button
+                      key={category.id}
+                      onClick={() => setSelectedCategory(category.id)}
+                      className={`inline-flex items-center px-4 py-2 rounded-lg border text-sm font-medium transition-all duration-200 ${
+                        selectedCategory === category.id
+                          ? 'bg-accent-600 border-accent-600 text-white dark:bg-accent-700 dark:border-accent-700'
+                          : 'bg-white dark:bg-dark-800 border-dark-200 dark:border-dark-600 text-dark-700 dark:text-dark-300 hover:border-accent-300 dark:hover:border-accent-600'
+                      }`}
+                    >
+                      <span className="mr-2">{getCategoryIcon(category.id)}</span>
+                      {category.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-          {/* No Stories State */}
-          {!loading && stories.length === 0 && !error && (
-            <div className="text-center py-12">
-              <div className="text-6xl mb-4">🔍</div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">No stories found</h3>
-              <p className="text-gray-600 mb-6">
-                Try adjusting your filters or clearing them to see more results.
-              </p>
-              <button
-                onClick={() => {
-                  setSelectedCategory('general');
-                  setSelectedYearRange('all');
-                }}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg"
-              >
-                Clear all filters
-              </button>
+              {/* Time Periods */}
+              <div className="card p-6 border border-dark-100 dark:border-dark-700">
+                <div className="flex items-center mb-4">
+                  <div className="w-10 h-10 rounded-lg bg-accent-100 dark:bg-dark-700 flex items-center justify-center text-accent-900 dark:text-accent-600 mr-3">
+                    <Clock className="w-5 h-5" />
+                  </div>
+                  <h3 className="text-lg font-display font-semibold text-dark-900 dark:text-white">Time Periods</h3>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {yearRanges.map((range) => (
+                    <button
+                      key={range.id}
+                      onClick={() => setSelectedYearRange(range.id)}
+                      className={`inline-flex items-center px-4 py-2 rounded-lg border text-sm font-medium transition-all duration-200 ${
+                        selectedYearRange === range.id
+                          ? 'bg-accent-600 border-accent-600 text-white dark:bg-accent-700 dark:border-accent-700'
+                          : 'bg-white dark:bg-dark-800 border-dark-200 dark:border-dark-600 text-dark-700 dark:text-dark-300 hover:border-accent-300 dark:hover:border-accent-600'
+                      }`}
+                    >
+                      {range.name}
+                      {range.count && (
+                        <span className="ml-2 text-xs bg-dark-100 dark:bg-dark-600 px-2 py-0.5 rounded">
+                          {range.count}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
-          )}
-        </div>
+
+            {/* Stories Section */}
+            <div className="card border border-dark-100 dark:border-dark-700">
+              <div className="p-6 border-b border-dark-100 dark:border-dark-700">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <div className="w-10 h-10 rounded-lg bg-accent-100 dark:bg-dark-700 flex items-center justify-center text-accent-900 dark:text-accent-600 mr-3">
+                      <Film className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-display font-bold text-dark-900 dark:text-white">Documentary Stories</h2>
+                      <p className="text-dark-600 dark:text-dark-300">
+                        {loading ? 'Discovering stories...' : `${stories.length} stories with documentary potential`}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="p-6">
+                {loading && (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="flex items-center space-x-3">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent-600"></div>
+                      <span className="text-dark-600 dark:text-dark-300">Discovering stories...</span>
+                    </div>
+                  </div>
+                )}
+
+                {error && (
+                  <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-300 px-4 py-3 rounded-md">
+                    {error}
+                  </div>
+                )}
+
+                {!loading && !error && stories.length === 0 && (
+                  <div className="text-center py-12">
+                    <p className="text-dark-500 dark:text-dark-400">No stories found for the selected criteria.</p>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {stories.map((story) => (
+                    <div
+                      key={story.id}
+                      onClick={() => openStory(story.id)}
+                      className="bg-white dark:bg-dark-800 border border-dark-200 dark:border-dark-700 rounded-lg p-6 cursor-pointer hover:border-accent-300 dark:hover:border-accent-600 transition-all duration-200 hover:shadow-lg dark:hover:shadow-dark-900/50"
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getDocumentaryColor(story.documentaryPotential)}`}>
+                          {story.documentaryPotential}% potential
+                        </span>
+                        <span className="text-sm text-dark-500 dark:text-dark-400">{story.year}</span>
+                      </div>
+                      
+                      <h3 className="text-lg font-semibold text-dark-900 dark:text-white mb-2 line-clamp-2">
+                        {story.title}
+                      </h3>
+                      
+                      <p className="text-dark-600 dark:text-dark-300 text-sm line-clamp-3 mb-4">
+                        {story.summary}
+                      </p>
+                      
+                      <div className="flex flex-wrap gap-1 mb-3">
+                        {story.themes?.slice(0, 3).map((theme, index) => (
+                          <span
+                            key={index}
+                            className="inline-flex items-center px-2 py-1 rounded text-xs bg-dark-100 dark:bg-dark-700 text-dark-700 dark:text-dark-300"
+                          >
+                            {theme}
+                          </span>
+                        ))}
+                      </div>
+                      
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-dark-500 dark:text-dark-400 capitalize">{story.category}</span>
+                        {story.narrativeScore && (
+                          <span className="text-accent-600 dark:text-accent-400 font-medium">
+                            {story.narrativeScore}% narrative
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
       </div>
     </>
   );
