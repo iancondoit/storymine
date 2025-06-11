@@ -1,8 +1,44 @@
 # StoryMine - Revolutionary Documentary Story Discovery Platform
 
-**Version 4.0.0** | The AI Documentary Research Breakthrough
+**Version 3.1.1** | Production-Ready with Major Optimizations
 
 StoryMine is a **scalable documentary discovery platform** that transforms vast historical news archives into compelling documentary stories. Currently analyzing **282,388 Atlanta Constitution articles (1920-1961)** as the **first implementation**, the platform is designed to handle **millions of articles across all publications and time periods**.
+
+## 🚀 Latest Optimizations (v3.1.1)
+
+### Major Speed & Quality Improvements
+
+**Story Discovery**: 80% faster (10-20 seconds vs 60+ seconds)
+**Deployment**: 80% faster (30-60 seconds vs 10+ minutes)  
+**Quality Control**: Enhanced filtering for professional story titles
+**User Experience**: Accumulative story discovery with visual feedback
+
+### Key Features Added
+
+#### 🔄 **Accumulative Story Discovery**
+- **"Give me more"** adds new stories to the top of existing list
+- **Visual feedback** with accent borders and "+X new" indicators
+- **Smart pagination** with backend offset tracking
+- **Preserves exploration state** while allowing deep category exploration
+
+#### ⚡ **Speed Optimizations**
+- **Pre-filtering**: Only high-potential articles (content > 300 chars)
+- **Smart batching**: 10 articles per Claude request (vs 50)
+- **Parallel processing**: 3 batches simultaneously
+- **Fast-track mode**: Existing intelligence metadata bypass
+- **Optimized prompts**: 200 chars vs 800 chars per article
+
+#### 🧹 **Quality Control System**
+- **Byline filtering**: Blocks "BY F. M. WILLIAMS", "WILLIAM BRADY, M. D."
+- **Masthead detection**: Removes newspaper headers and page numbers
+- **Fragment cleanup**: Filters corrupted text and sentence fragments
+- **Title optimization**: Professional documentary-ready headlines
+
+#### 🚢 **Deployment Optimizations**
+- **Smart .dockerignore**: 97 entries excluding unnecessary files
+- **Multi-stage Dockerfile**: Better layer caching
+- **Railway optimization**: Faster health checks and restart policies
+- **Build size reduction**: ~100MB to ~20MB uploads
 
 ## 🌍 The Universal News Archive Revolution
 

@@ -184,30 +184,62 @@ export class ClaudeNarrativeService {
       const hasTitle = article.title && article.title.length > 10;
       const hasYear = article.year >= 1920 && article.year <= 1961;
       
-      // Quality control: Filter out bad titles - simplified patterns
+      // Enhanced quality control: Filter out bad titles with nuanced patterns
       const title = (article.title || '').toUpperCase();
+      const originalTitle = article.title || '';
       const isBadTitle = 
+        // Newspaper mastheads and headers
         title.includes('NEWSPAPER') ||
         title.includes('STANDARD') ||
         title.includes('DAILY') ||
         title.includes('CONSTITUTION') ||
-        title.startsWith('OF ANY') ||
-        title.startsWith(')') ||
-        title.includes('CONTINUES, IT WILL') ||
-        title.length < 5 ||
         title.includes('PAGE') ||
         title.includes('EDITION') ||
         title.includes('VOLUME') ||
         title.includes('MASTHEAD') ||
-        // Filter out bylines (author credits) - simplified
+        
+        // Church/institution fragments (not meaningful stories)
+        (title.endsWith('PRESBYTERIAN.') && originalTitle.length < 25) ||
+        (title.endsWith('METHODIST.') && originalTitle.length < 25) ||
+        (title.endsWith('BAPTIST.') && originalTitle.length < 25) ||
+        (title.endsWith('EPISCOPAL.') && originalTitle.length < 25) ||
+        (title.endsWith('CATHOLIC.') && originalTitle.length < 25) ||
+        (title.endsWith('CHURCH.') && originalTitle.length < 25) ||
+        (title === 'FIRST PRESBYTERIAN.') ||
+        (title === 'SECOND BAPTIST.') ||
+        (title === 'ST. JOHN\'S.') ||
+        
+        // Bylines and attribution
         title.startsWith('BY ') ||
         title.startsWith('FROM ') ||
         title.includes(', M. D.') ||
         title.includes(', DR.') ||
-        // Filter out corrupted text
+        title.includes(', MD') ||
+        
+        // Incomplete phrases and fragments
+        title.startsWith('OF ANY') ||
+        title.startsWith(')') ||
+        title.startsWith('THE LAST-MINUTE') ||
+        title.startsWith('AVOID THE LAST-MINUTE') ||
+        title.endsWith(' THE') ||
+        title.endsWith(' TO') ||
+        title.endsWith(' OF') ||
+        title.endsWith(' AND') ||
+        title.endsWith(' OR') ||
+        
+        // Corrupted text patterns
         title.includes('ISFVO') ||
         title.includes('CERTAINTY') ||
-        title.length > 100;
+        title.includes('EDLOMAND') ||
+        title.includes('WNW EM') ||
+        title.includes('Ad bo') ||
+        title.includes('CONTINUES, IT WILL') ||
+        
+        // Structural issues
+        originalTitle.length < 5 ||
+        originalTitle.length > 100 ||
+        originalTitle.endsWith('.') && originalTitle.length < 20 ||
+        originalTitle.split(' ').length < 2 && !originalTitle.includes('-');
       
       return hasGoodContent && hasTitle && hasYear && !isBadTitle;
     });
@@ -366,29 +398,60 @@ Return JSON (no other text):
     try {
       const upper = title.toUpperCase();
       
-      // Filter out newspaper mastheads and fragments
+      // Comprehensive title filtering - expanded patterns
       const isBadTitle = 
+        // Newspaper mastheads and headers
         upper.includes('NEWSPAPER') ||
         upper.includes('STANDARD') ||
         upper.includes('DAILY') ||
         upper.includes('CONSTITUTION') ||
-        upper.startsWith('OF ANY') ||
-        upper.startsWith(')') ||
-        upper.includes('CONTINUES, IT WILL') ||
-        title.length < 5 ||
         upper.includes('PAGE') ||
         upper.includes('EDITION') ||
         upper.includes('VOLUME') ||
         upper.includes('MASTHEAD') ||
-        // Filter out bylines (author credits) - simplified patterns
+        
+        // Church/institution fragments (not meaningful stories)
+        (upper.endsWith('PRESBYTERIAN.') && title.length < 25) ||
+        (upper.endsWith('METHODIST.') && title.length < 25) ||
+        (upper.endsWith('BAPTIST.') && title.length < 25) ||
+        (upper.endsWith('EPISCOPAL.') && title.length < 25) ||
+        (upper.endsWith('CATHOLIC.') && title.length < 25) ||
+        (upper.endsWith('CHURCH.') && title.length < 25) ||
+        (upper === 'FIRST PRESBYTERIAN.') ||
+        (upper === 'SECOND BAPTIST.') ||
+        (upper === 'ST. JOHN\'S.') ||
+        
+        // Bylines and attribution
         upper.startsWith('BY ') ||
         upper.startsWith('FROM ') ||
         upper.includes(', M. D.') ||
         upper.includes(', DR.') ||
-        // Filter out sentence fragments and corrupted text
+        upper.includes(', MD') ||
+        
+        // Incomplete phrases and fragments
+        upper.startsWith('OF ANY') ||
+        upper.startsWith(')') ||
+        upper.startsWith('THE LAST-MINUTE') ||
+        upper.startsWith('AVOID THE LAST-MINUTE') ||
+        upper.endsWith(' THE') ||
+        upper.endsWith(' TO') ||
+        upper.endsWith(' OF') ||
+        upper.endsWith(' AND') ||
+        upper.endsWith(' OR') ||
+        
+        // Corrupted text patterns
         upper.includes('ISFVO') ||
         upper.includes('CERTAINTY') ||
-        upper.length > 100; // Suspiciously long titles
+        upper.includes('EDLOMAND') ||
+        upper.includes('WNW EM') ||
+        upper.includes('Ad bo') ||
+        upper.includes('CONTINUES, IT WILL') ||
+        
+        // Structural issues
+        title.length < 5 ||
+        title.length > 100 ||
+        title.endsWith('.') && title.length < 20 || // Short titles ending in period (likely fragments)
+        title.split(' ').length < 2 && !title.includes('-'); // Single words (unless hyphenated)
       
       if (isBadTitle) return null; // Signal to skip this story
       

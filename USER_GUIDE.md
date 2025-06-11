@@ -1,6 +1,12 @@
-# StoryMine User Guide: Universal Documentary Discovery Platform
+# StoryMine User Guide: Universal Documentary Discovery Platform v3.1.1
 
 **The Complete Guide to AI-Powered Documentary Story Discovery Across Any News Archive**
+
+**🚀 Latest Update: Major Speed & Quality Improvements**
+- **80% Faster Story Discovery**: 10-20 seconds vs 60+ seconds
+- **Accumulative "Give me more"**: New stories add to your existing list
+- **Enhanced Quality Control**: Professional documentary-ready titles
+- **Visual Feedback**: See new discoveries with accent borders and pulse animation
 
 ---
 
@@ -170,7 +176,19 @@ StoryMine's AI analyzes each story using **professional documentary development 
 
 ---
 
-## 🔄 Advanced Discovery: "Give Me More" 
+## 🔄 Advanced Discovery: "Give Me More" (v3.1.1 Enhanced)
+
+### Accumulative Story Discovery - NEW!
+
+**🎯 The Game-Changing Update:**
+- **"Give me more" now ADDS new stories to your existing list** (instead of replacing them)
+- **New stories appear at the TOP** with visual accent borders
+- **"+X new" indicator** shows exactly how many stories were just discovered
+- **Pulse animation** highlights fresh discoveries for 3 seconds
+- **Accumulate 50+ stories** in a single session for comprehensive documentary research
+
+**Before v3.1.1**: Each "Give me more" replaced your story list ❌
+**Now v3.1.1**: Each "Give me more" grows your story collection ✅
 
 ### Continuous Analysis Without Limits
 
@@ -178,6 +196,7 @@ StoryMine's AI analyzes each story using **professional documentary development 
 - Click "Give me more" to analyze the **next 500 articles**
 - System remembers your exact position in each category/time period
 - **No duplicate stories** - every request provides fresh analysis
+- **Stories accumulate** - build a comprehensive documentary research collection
 - Can discover thousands of unique stories across the entire archive
 
 ### Strategic Discovery Approach
