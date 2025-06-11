@@ -136,14 +136,20 @@ export class ClaudeNarrativeService {
       AND a.title NOT ILIKE '%elastic line%'
       AND a.title NOT ILIKE '%no new idea%'
       AND a.title NOT ILIKE '%hockey%'
+      AND a.title NOT ILIKE '%to make your will%'
+      AND a.title NOT ILIKE '%first christian science%'
+      AND a.title NOT ILIKE '%. ' 
       AND a.title NOT LIKE '%\\%'
       AND a.title NOT LIKE '%(%'
       AND a.title NOT LIKE '%)%'
       AND a.title NOT LIKE '%-%-%'
       AND a.title NOT LIKE '%.-%'
-      AND LEFT(a.title, 3) NOT IN ('BY ', 'AD ', 'NO ', '1 N', 'A A', 'C P')
+      AND a.title NOT LIKE '%.'
+      AND LEFT(a.title, 3) NOT IN ('BY ', 'AD ', 'NO ', '1 N', 'A A', 'C P', 'TO ')
       AND a.title NOT SIMILAR TO '%[0-9]{3,}%'
-      AND a.title ~ '^[A-Z][a-zA-Z .,;:!?''-]{10,80}[.!?]?$'
+      AND LENGTH(TRIM(a.title)) > 15
+      AND a.title NOT LIKE '% %.'
+      AND a.title ~ '^[A-Z][a-zA-Z0-9 .,;:!?''-]{15,80}[^.]$|^[A-Z][a-zA-Z0-9 .,;:!?''-]{15,80}[.!?]$'
       ORDER BY LENGTH(a.content) DESC, RANDOM()
       LIMIT $${params.length + 1}
       OFFSET $${params.length + 2}
@@ -615,19 +621,41 @@ Return JSON (no other text):
         }
       }
       
-      // Method 3: Clean up common JSON issues and try again
+      // Method 3: Aggressive JSON cleanup and reconstruction
       if (!jsonData && jsonMatch) {
         let cleanJson = jsonMatch[0];
-        // Fix common issues
-        cleanJson = cleanJson.replace(/[\u0000-\u001F\u007F-\u009F]/g, ''); // Remove control characters
+        console.log(`🔧 Attempting aggressive JSON cleanup on: ${cleanJson.substring(0, 100)}...`);
+        
+        // Remove all control characters and fix encoding issues
+        cleanJson = cleanJson.replace(/[\u0000-\u001F\u007F-\u009F]/g, '');
         cleanJson = cleanJson.replace(/,(\s*[}\]])/g, '$1'); // Remove trailing commas
-        cleanJson = cleanJson.replace(/'/g, '"'); // Replace single quotes with double quotes
+        cleanJson = cleanJson.replace(/'/g, '"'); // Replace single quotes
+        cleanJson = cleanJson.replace(/\n/g, ' '); // Remove newlines
+        cleanJson = cleanJson.replace(/\r/g, ' '); // Remove carriage returns
+        cleanJson = cleanJson.replace(/\t/g, ' '); // Remove tabs
         
         try {
           jsonData = JSON.parse(cleanJson);
-          console.log(`✅ JSON parsed successfully with method 3 (cleanup)`);
+          console.log(`✅ JSON parsed successfully with method 3 (aggressive cleanup)`);
         } catch (parseError: any) {
           console.log(`⚠️ Method 3 failed: ${parseError.message}`);
+          console.log(`🔍 Cleaned JSON sample: ${cleanJson.substring(0, 200)}...`);
+        }
+      }
+      
+      // Method 4: Emergency reconstruction if all else fails
+      if (!jsonData) {
+        console.log(`🚨 All JSON parsing failed, attempting emergency reconstruction...`);
+        try {
+          // Extract just the stories array if possible  
+          const storiesMatch = responseText.match(/"stories"\s*:\s*\[([\s\S]*?)\]/);
+          if (storiesMatch) {
+            const reconstructed = `{"stories":[${storiesMatch[1]}]}`;
+            jsonData = JSON.parse(reconstructed);
+            console.log(`✅ Emergency reconstruction successful`);
+          }
+        } catch (emergencyError: any) {
+          console.log(`❌ Emergency reconstruction failed: ${emergencyError.message}`);
         }
       }
       
