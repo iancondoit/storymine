@@ -557,18 +557,70 @@ Return JSON (no other text):
       const messages = [{ role: 'user', content: prompt }];
       const response = await claudeService.callClaude(messages);
       
-      // Parse Claude's JSON response
+      // Robust JSON parsing - handle Claude's varied response formats
       const responseText = response.text.trim();
+      console.log(`📝 Claude raw response length: ${responseText.length} chars`);
       
-      // Extract JSON from Claude's response
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      // Try multiple JSON extraction methods
+      let jsonData = null;
+      
+      // Method 1: Find JSON between curly braces (most common)
+      let jsonMatch = responseText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
-      } else {
-        throw new Error('No JSON found in Claude response');
+        try {
+          jsonData = JSON.parse(jsonMatch[0]);
+          console.log(`✅ JSON parsed successfully with method 1`);
+        } catch (parseError: any) {
+          console.log(`⚠️ Method 1 failed: ${parseError.message}`);
+        }
       }
-    } catch (error) {
-      console.error('Claude analysis error:', error);
+      
+      // Method 2: Find JSON with ```json blocks
+      if (!jsonData) {
+        const codeBlockMatch = responseText.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+        if (codeBlockMatch) {
+          try {
+            jsonData = JSON.parse(codeBlockMatch[1]);
+            console.log(`✅ JSON parsed successfully with method 2`);
+          } catch (parseError: any) {
+            console.log(`⚠️ Method 2 failed: ${parseError.message}`);
+          }
+        }
+      }
+      
+      // Method 3: Clean up common JSON issues and try again
+      if (!jsonData && jsonMatch) {
+        let cleanJson = jsonMatch[0];
+        // Fix common issues
+        cleanJson = cleanJson.replace(/[\u0000-\u001F\u007F-\u009F]/g, ''); // Remove control characters
+        cleanJson = cleanJson.replace(/,(\s*[}\]])/g, '$1'); // Remove trailing commas
+        cleanJson = cleanJson.replace(/'/g, '"'); // Replace single quotes with double quotes
+        
+        try {
+          jsonData = JSON.parse(cleanJson);
+          console.log(`✅ JSON parsed successfully with method 3 (cleanup)`);
+        } catch (parseError: any) {
+          console.log(`⚠️ Method 3 failed: ${parseError.message}`);
+        }
+      }
+      
+      if (!jsonData) {
+        console.error(`❌ All JSON parsing methods failed. Raw response: ${responseText.substring(0, 200)}...`);
+        throw new Error('Could not parse JSON from Claude response');
+      }
+      
+      // Validate JSON structure
+      if (!jsonData.stories || !Array.isArray(jsonData.stories)) {
+        console.error(`❌ Invalid JSON structure - missing stories array`);
+        throw new Error('Invalid JSON structure from Claude');
+      }
+      
+      console.log(`🎯 Successfully parsed ${jsonData.stories.length} stories from Claude`);
+      return jsonData;
+      
+    } catch (error: any) {
+      console.error('❌ Claude analysis error:', error.message);
+      console.error('📝 Error details:', error);
       throw error;
     }
   }
