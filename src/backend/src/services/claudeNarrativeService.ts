@@ -106,7 +106,7 @@ export class ClaudeNarrativeService {
       }
     }
 
-    // Get substantial articles - just like my manual query
+    // Get high-quality articles with aggressive database filtering
     const queryText = `
       SELECT 
         a.id,
@@ -117,6 +117,33 @@ export class ClaudeNarrativeService {
         EXTRACT(YEAR FROM a.publication_date) as year
       FROM intelligence_articles a
       ${whereClause}
+      AND LENGTH(a.content) > 1000
+      AND LENGTH(a.title) > 15
+      AND LENGTH(a.title) < 100
+      AND a.title NOT ILIKE '%weather bureau%'
+      AND a.title NOT ILIKE '%reports of%'
+      AND a.title NOT ILIKE '%newtons%'
+      AND a.title NOT ILIKE '%ice cream%'
+      AND a.title NOT ILIKE '%fig%'
+      AND a.title NOT ILIKE '%-willys-%'
+      AND a.title NOT ILIKE '%overland%'
+      AND a.title NOT ILIKE '%new fiction%'
+      AND a.title NOT ILIKE '%new books%'
+      AND a.title NOT ILIKE '%fifth avenue%'
+      AND a.title NOT ILIKE '%will you take part%'
+      AND a.title NOT ILIKE '% + %'
+      AND a.title NOT ILIKE '%blasted%'
+      AND a.title NOT ILIKE '%elastic line%'
+      AND a.title NOT ILIKE '%no new idea%'
+      AND a.title NOT ILIKE '%hockey%'
+      AND a.title NOT LIKE '%\\%'
+      AND a.title NOT LIKE '%(%'
+      AND a.title NOT LIKE '%)%'
+      AND a.title NOT LIKE '%-%-%'
+      AND a.title NOT LIKE '%.-%'
+      AND LEFT(a.title, 3) NOT IN ('BY ', 'AD ', 'NO ', '1 N', 'A A', 'C P')
+      AND a.title NOT SIMILAR TO '%[0-9]{3,}%'
+      AND a.title ~ '^[A-Z][a-zA-Z .,;:!?''-]{10,80}[.!?]?$'
       ORDER BY LENGTH(a.content) DESC, RANDOM()
       LIMIT $${params.length + 1}
       OFFSET $${params.length + 2}
