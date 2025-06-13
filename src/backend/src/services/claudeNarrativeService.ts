@@ -138,6 +138,21 @@ export class ClaudeNarrativeService {
       const result = await query(queryText, params);
       console.log(`📚 Retrieved ${result.rows.length} pre-scored articles (offset: ${currentOffset})`);
       
+      // Debug: Log sample data to understand what we're getting
+      if (result.rows.length > 0) {
+        const sample = result.rows[0];
+        console.log('🔍 Sample article data:', {
+          id: sample.id,
+          title: sample.title?.substring(0, 50) + '...',
+          year: sample.year,
+          documentary_potential: sample.documentary_potential,
+          narrative_score: sample.narrative_score,
+          primary_themes: sample.primary_themes,
+          primary_location: sample.primary_location,
+          content_length: sample.content_length
+        });
+      }
+      
       // Update offset for next "give me more" request
       this.currentOffset.set(offsetKey, currentOffset + result.rows.length);
       
@@ -232,18 +247,60 @@ export class ClaudeNarrativeService {
     const year = article.year || new Date(article.publication_date).getFullYear();
     const themes = this.combineThemes(article.primary_themes, article.secondary_themes);
     const location = article.primary_location || 'Atlanta';
+    const title = article.title || '';
+    const content = article.content_preview || '';
     
+    // Try to create a more specific summary based on content
+    if (content && content.length > 100) {
+      // Extract key information from content
+      const contentLower = content.toLowerCase();
+      let summary = '';
+      
+      // Theme-specific summaries
+      if (themes.includes('Politics') || contentLower.includes('election') || contentLower.includes('mayor')) {
+        summary = `A political story from ${year} documenting electoral dynamics and governance in ${location}.`;
+      } else if (themes.includes('Crime') || contentLower.includes('murder') || contentLower.includes('trial')) {
+        summary = `A crime and justice story from ${year} revealing the legal system and social tensions in ${location}.`;
+      } else if (themes.includes('War') || contentLower.includes('war') || contentLower.includes('military')) {
+        summary = `A wartime story from ${year} capturing the impact of military conflict on ${location} and its residents.`;
+      } else if (themes.includes('Business') || contentLower.includes('company') || contentLower.includes('industry')) {
+        summary = `An economic story from ${year} documenting business development and industrial growth in ${location}.`;
+      } else if (themes.includes('Women') || contentLower.includes('women') || contentLower.includes('suffrage')) {
+        summary = `A story of women's experiences and social change in ${year} ${location}, documenting evolving gender roles.`;
+      } else {
+        // Generic but varied summary
+        const summaryTemplates = [
+          `A historical account from ${year} that illuminates daily life and social dynamics in ${location}.`,
+          `A documentary-worthy story from ${year} capturing the spirit and challenges of the era in ${location}.`,
+          `An engaging narrative from ${year} that reveals the human experience during this period in ${location}.`,
+          `A compelling story from ${year} documenting significant events and social change in ${location}.`
+        ];
+        summary = summaryTemplates[Math.floor(Math.random() * summaryTemplates.length)];
+      }
+      
+      // Add quality context
+      const docScore = Math.round(article.documentary_potential * 100);
+      const narScore = Math.round(article.narrative_score * 100);
+      
+      if (docScore >= 80 && narScore >= 80) {
+        summary += ` This exceptional story offers strong visual and narrative elements ideal for documentary production.`;
+      } else if (docScore >= 70 || narScore >= 70) {
+        summary += ` This compelling story provides good documentary potential with engaging narrative structure.`;
+      } else {
+        summary += ` This story offers valuable historical insights with moderate documentary potential.`;
+      }
+      
+      return summary;
+    }
+    
+    // Fallback to theme-based summary
     const qualityIndicator = article.documentary_potential >= 0.8 ? 'exceptional' : 
                            article.documentary_potential >= 0.7 ? 'compelling' : 
                            article.documentary_potential >= 0.6 ? 'significant' : 'notable';
     
-    const narrativeIndicator = article.narrative_score >= 0.8 ? 'dramatic' : 
-                              article.narrative_score >= 0.7 ? 'engaging' : 
-                              article.narrative_score >= 0.6 ? 'structured' : 'informative';
+    const themeText = themes.length > 0 ? ` exploring themes of ${themes.slice(0, 2).join(' and ')}` : '';
     
-    const themeText = themes.length > 0 ? ` exploring themes of ${themes.slice(0, 3).join(', ')}` : '';
-    
-    return `A ${qualityIndicator} ${narrativeIndicator} story from ${year} in ${location}${themeText}. This article demonstrates strong documentary potential (${Math.round(article.documentary_potential * 100)}%) with ${narrativeIndicator} narrative structure (${Math.round(article.narrative_score * 100)}%), making it ideal for historical documentary production.`;
+    return `A ${qualityIndicator} story from ${year} in ${location}${themeText}. Documentary potential: ${Math.round(article.documentary_potential * 100)}%, Narrative score: ${Math.round(article.narrative_score * 100)}%.`;
   }
 
   /**
@@ -276,18 +333,24 @@ export class ClaudeNarrativeService {
    * Enhance documentary title using themes and year
    */
   private enhanceDocumentaryTitle(originalTitle: string, themes: string[], year: number): string {
-    // Use existing createDocumentaryTitle method as base
-    const baseTitle = this.createDocumentaryTitle(originalTitle, '', year);
-    
-    // Add thematic context if available
-    if (themes.length > 0) {
-      const primaryTheme = themes[0];
-      if (primaryTheme && !baseTitle.toLowerCase().includes(primaryTheme.toLowerCase())) {
-        return `${baseTitle}: ${primaryTheme}`;
+    // Use the original article title if it's meaningful
+    if (originalTitle && originalTitle.length > 10 && !originalTitle.includes('Untitled')) {
+      // Clean up the original title
+      let cleanTitle = originalTitle.trim();
+      
+      // Remove common newspaper artifacts
+      cleanTitle = cleanTitle.replace(/^(THE CONSTITUTION|ATLANTA CONSTITUTION)[,\s]*/i, '');
+      cleanTitle = cleanTitle.replace(/\s*-\s*Page\s*\d+/i, '');
+      cleanTitle = cleanTitle.replace(/\s*\(\d{4}\)\s*$/, '');
+      
+      // If the cleaned title is still meaningful, use it
+      if (cleanTitle.length > 10) {
+        return cleanTitle;
       }
     }
     
-    return baseTitle;
+    // Fallback to creating a documentary title only if original is poor
+    return this.createDocumentaryTitle(originalTitle, '', year);
   }
 
   /**
