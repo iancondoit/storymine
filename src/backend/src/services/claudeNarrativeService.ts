@@ -21,7 +21,8 @@ export class ClaudeNarrativeService {
 
   /**
    * JORDI INTELLIGENCE: Smart Story Discovery using StoryMap Intelligence Data
-   * 282,388 Atlanta Constitution articles (1920-1961) with documentary scoring
+   * 282,388 Atlanta Constitution articles (1890-1950) with pre-scored documentary potential
+   * NOW USING AWS DEPLOYED DATA WITH GUARANTEED NON-NULL SCORES
    */
   async getCuratedStoryOptions(options: {
     category?: string;
@@ -33,15 +34,383 @@ export class ClaudeNarrativeService {
     // First try intelligent queries if database connected
     if (this.hasDatabase) {
       try {
-        return await this.getIntelligentStoryOptions(category, yearRange, count);
+        return await this.getPreScoredStoryOptions(category, yearRange, count);
       } catch (error) {
-        console.log('Intelligence query failed, falling back to legacy method:', error);
+        console.log('Pre-scored query failed, falling back to legacy method:', error);
         this.hasDatabase = false;
       }
     }
 
     // Fallback to legacy method
     return await this.getLegacyStoryOptions(category, count);
+  }
+
+  /**
+   * NEW: Use pre-scored articles from AWS deployment
+   * Leverages documentary_potential and narrative_score fields (guaranteed non-null)
+   */
+  private async getPreScoredStoryOptions(category: string, yearRange: string, count: number) {
+    console.log(`🎬 JORDI INTELLIGENCE: Using AWS pre-scored articles for documentary discovery`);
+    console.log(`📊 Target: ${count} stories from category: ${category}, period: ${yearRange}`);
+
+    let whereClause = 'WHERE documentary_potential IS NOT NULL AND narrative_score IS NOT NULL';
+    whereClause += ` AND documentary_potential >= 0.5`; // Minimum quality threshold
+    whereClause += ` AND narrative_score >= 0.4`; // Minimum narrative potential
+    
+    const params: any[] = [];
+
+    // Category filtering using themes and content
+    if (category !== 'general') {
+      const categoryTerms: Record<string, string[]> = {
+        'politics': ['election', 'governor', 'mayor', 'politics', 'political', 'vote', 'campaign', 'democratic', 'republican'],
+        'crime': ['murder', 'trial', 'arrest', 'crime', 'criminal', 'court', 'judge', 'jury', 'police', 'investigation'],
+        'war': ['war', 'military', 'soldier', 'battle', 'army', 'navy', 'defense', 'victory', 'combat'],
+        'business': ['company', 'bank', 'economic', 'business', 'industry', 'factory', 'commerce', 'market', 'financial'],
+        'sports': ['baseball', 'football', 'game', 'sports', 'athletic', 'team', 'player', 'championship', 'stadium'],
+        'women': ['women', 'ladies', 'wife', 'mother', 'suffrage', 'female', 'daughter', 'marriage'],
+        'protests': ['strike', 'demonstration', 'union', 'protest', 'march', 'rally', 'workers', 'labor'],
+        'education': ['school', 'university', 'college', 'education', 'student', 'teacher', 'academic'],
+        'entertainment': ['theater', 'music', 'show', 'entertainment', 'concert', 'performance', 'artist', 'culture']
+      };
+
+      if (categoryTerms[category]) {
+        const terms = categoryTerms[category];
+        const categoryConditions = terms.map((term, i) => {
+          params.push(`%${term}%`);
+          return `(title ILIKE $${params.length} OR content ILIKE $${params.length} OR primary_themes::text ILIKE $${params.length})`;
+        }).join(' OR ');
+        whereClause += ` AND (${categoryConditions})`;
+      }
+    }
+
+    // Year range filtering  
+    if (yearRange !== 'all') {
+      const yearRanges: Record<string, string[]> = {
+        '1890-1900': ['1890-01-01', '1900-12-31'],
+        '1900-1910': ['1900-01-01', '1910-12-31'],
+        '1910-1920': ['1910-01-01', '1920-12-31'],
+        '1920-1930': ['1920-01-01', '1930-12-31'],
+        '1930-1940': ['1930-01-01', '1940-12-31'],
+        '1940-1950': ['1940-01-01', '1950-12-31']
+      };
+
+      if (yearRanges[yearRange]) {
+        const [startDate, endDate] = yearRanges[yearRange];
+        params.push(startDate, endDate);
+        whereClause += ` AND publication_date BETWEEN $${params.length - 1} AND $${params.length}`;
+      }
+    }
+
+    // Query pre-scored articles from AWS database
+    const queryText = `
+      SELECT 
+        storymap_id as id,
+        title,
+        LEFT(content, 2000) as content_preview,
+        LENGTH(content) as content_length,
+        publication_date,
+        EXTRACT(YEAR FROM publication_date) as year,
+        documentary_potential,
+        narrative_score,
+        primary_themes,
+        secondary_themes,
+        primary_location,
+        secondary_locations
+      FROM intelligence_articles
+      ${whereClause}
+      ORDER BY 
+        (documentary_potential * 0.6 + narrative_score * 0.4) DESC,
+        documentary_potential DESC,
+        narrative_score DESC,
+        RANDOM()
+      LIMIT $${params.length + 1}
+      OFFSET $${params.length + 2}
+    `;
+
+    // Track pagination for "give me more" functionality
+    const offsetKey = `${category}-${yearRange}`;
+    const currentOffset = this.currentOffset.get(offsetKey) || 0;
+    
+    params.push(count); // LIMIT
+    params.push(currentOffset); // OFFSET
+
+    try {
+      const result = await query(queryText, params);
+      console.log(`📚 Retrieved ${result.rows.length} pre-scored articles (offset: ${currentOffset})`);
+      
+      // Update offset for next "give me more" request
+      this.currentOffset.set(offsetKey, currentOffset + result.rows.length);
+      
+      if (result.rows.length === 0) {
+        console.log('❌ No more pre-scored articles found, resetting offset...');
+        this.currentOffset.set(offsetKey, 0); // Reset for next search
+        return await this.getLegacyStoryOptions(category, count);
+      }
+      
+      // Transform pre-scored articles into documentary stories
+      const documentaryStories = result.rows.map(article => this.transformPreScoredArticle(article));
+      
+      return {
+        success: true,
+        stories: documentaryStories,
+        metadata: {
+          source: 'aws_prescored_intelligence',
+          category,
+          yearRange,
+          articlesRetrieved: result.rows.length,
+          storiesGenerated: documentaryStories.length,
+          analysisMethod: 'storymap_intelligence_scores',
+          timestamp: new Date().toISOString(),
+          qualityRange: {
+            minDocumentaryPotential: Math.min(...result.rows.map(r => r.documentary_potential)),
+            maxDocumentaryPotential: Math.max(...result.rows.map(r => r.documentary_potential)),
+            minNarrativeScore: Math.min(...result.rows.map(r => r.narrative_score)),
+            maxNarrativeScore: Math.max(...result.rows.map(r => r.narrative_score))
+          }
+        }
+      };
+    } catch (error) {
+      console.error('💡 Pre-scored article query failed:', error);
+      this.hasDatabase = false;
+      return await this.getLegacyStoryOptions(category, count);
+    }
+  }
+
+  /**
+   * Transform pre-scored article into documentary story format
+   */
+  private transformPreScoredArticle(article: any): any {
+    const year = article.year || new Date(article.publication_date).getFullYear();
+    const themes = this.combineThemes(article.primary_themes, article.secondary_themes);
+    const category = this.categorizeFromThemes(themes);
+    
+    return {
+      id: `story_${article.id}`,
+      title: this.enhanceDocumentaryTitle(article.title, themes, year),
+      summary: this.generateSummaryFromPreScoredData(article),
+      category: category,
+      year: year,
+      themes: themes,
+      location: article.primary_location || this.extractLocationFromContent(article.content_preview),
+      documentaryPotential: Math.round(article.documentary_potential * 100),
+      narrativeScore: Math.round(article.narrative_score * 100),
+      elements: this.extractElementsFromPreScoredData(article),
+      source: {
+        type: 'intelligence_prescored',
+        articleId: article.id,
+        contentLength: article.content_length,
+        publicationDate: article.publication_date,
+        intelligenceScores: {
+          documentary: article.documentary_potential,
+          narrative: article.narrative_score
+        }
+      }
+    };
+  }
+
+  /**
+   * Combine primary and secondary themes
+   */
+  private combineThemes(primaryThemes: string[] | null, secondaryThemes: string[] | null): string[] {
+    const themes: string[] = [];
+    
+    if (primaryThemes && Array.isArray(primaryThemes)) {
+      themes.push(...primaryThemes);
+    }
+    
+    if (secondaryThemes && Array.isArray(secondaryThemes)) {
+      themes.push(...secondaryThemes.slice(0, 2)); // Add up to 2 secondary themes
+    }
+    
+    return themes.slice(0, 5); // Limit to 5 total themes
+  }
+
+  /**
+   * Generate summary from pre-scored data
+   */
+  private generateSummaryFromPreScoredData(article: any): string {
+    const year = article.year || new Date(article.publication_date).getFullYear();
+    const themes = this.combineThemes(article.primary_themes, article.secondary_themes);
+    const location = article.primary_location || 'Atlanta';
+    
+    const qualityIndicator = article.documentary_potential >= 0.8 ? 'exceptional' : 
+                           article.documentary_potential >= 0.7 ? 'compelling' : 
+                           article.documentary_potential >= 0.6 ? 'significant' : 'notable';
+    
+    const narrativeIndicator = article.narrative_score >= 0.8 ? 'dramatic' : 
+                              article.narrative_score >= 0.7 ? 'engaging' : 
+                              article.narrative_score >= 0.6 ? 'structured' : 'informative';
+    
+    const themeText = themes.length > 0 ? ` exploring themes of ${themes.slice(0, 3).join(', ')}` : '';
+    
+    return `A ${qualityIndicator} ${narrativeIndicator} story from ${year} in ${location}${themeText}. This article demonstrates strong documentary potential (${Math.round(article.documentary_potential * 100)}%) with ${narrativeIndicator} narrative structure (${Math.round(article.narrative_score * 100)}%), making it ideal for historical documentary production.`;
+  }
+
+  /**
+   * Extract documentary elements from pre-scored data
+   */
+  private extractElementsFromPreScoredData(article: any): any {
+    const year = article.year || new Date(article.publication_date).getFullYear();
+    const themes = this.combineThemes(article.primary_themes, article.secondary_themes);
+    
+    return {
+      setting: {
+        time: year,
+        place: article.primary_location || 'Atlanta, Georgia',
+        context: this.getHistoricalContext(year).context
+      },
+      characters: this.extractCharactersFromContent(article.content_preview),
+      conflict: this.inferConflictFromThemes(themes),
+      stakes: this.inferStakesFromThemes(themes, year),
+      visualElements: this.identifyVisualElementsFromThemes(themes, article.primary_location),
+      archivalPotential: {
+        photographs: article.documentary_potential >= 0.7,
+        documents: article.documentary_potential >= 0.6,
+        interviews: article.narrative_score >= 0.7,
+        locations: !!article.primary_location
+      }
+    };
+  }
+
+  /**
+   * Enhance documentary title using themes and year
+   */
+  private enhanceDocumentaryTitle(originalTitle: string, themes: string[], year: number): string {
+    // Use existing createDocumentaryTitle method as base
+    const baseTitle = this.createDocumentaryTitle(originalTitle, '', year);
+    
+    // Add thematic context if available
+    if (themes.length > 0) {
+      const primaryTheme = themes[0];
+      if (primaryTheme && !baseTitle.toLowerCase().includes(primaryTheme.toLowerCase())) {
+        return `${baseTitle}: ${primaryTheme}`;
+      }
+    }
+    
+    return baseTitle;
+  }
+
+  /**
+   * Extract location from content preview
+   */
+  private extractLocationFromContent(content: string): string {
+    const locationPatterns = [
+      /in ([A-Z][a-z]+ (?:County|City|Street|Avenue|Road))/i,
+      /at ([A-Z][a-z]+ (?:Hospital|School|Church|Building))/i,
+      /from ([A-Z][a-z]+ (?:Georgia|Alabama|Tennessee))/i
+    ];
+    
+    for (const pattern of locationPatterns) {
+      const match = content.match(pattern);
+      if (match) {
+        return match[1];
+      }
+    }
+    
+    return 'Atlanta, Georgia';
+  }
+
+  /**
+   * Extract characters from content preview
+   */
+  private extractCharactersFromContent(content: string): string[] {
+    // Use existing extractCharacters method
+    return this.extractCharacters(content);
+  }
+
+  /**
+   * Infer conflict from themes
+   */
+  private inferConflictFromThemes(themes: string[]): string {
+    const conflictMap: Record<string, string> = {
+      'politics': 'Political tensions and competing interests',
+      'crime': 'Criminal activity threatening community safety',
+      'war': 'Military conflict and its impact on society',
+      'business': 'Economic pressures and commercial disputes',
+      'protests': 'Social unrest and calls for change',
+      'civil rights': 'Struggle for equality and justice',
+      'labor': 'Workers fighting for better conditions',
+      'education': 'Challenges in educational access and quality'
+    };
+    
+    for (const theme of themes) {
+      const lowerTheme = theme.toLowerCase();
+      for (const [key, conflict] of Object.entries(conflictMap)) {
+        if (lowerTheme.includes(key)) {
+          return conflict;
+        }
+      }
+    }
+    
+    return 'Social and cultural tensions of the era';
+  }
+
+  /**
+   * Infer stakes from themes and year
+   */
+  private inferStakesFromThemes(themes: string[], year: number): string {
+    const stakesMap: Record<string, string> = {
+      'politics': 'Democratic governance and public trust',
+      'crime': 'Community safety and justice',
+      'war': 'National security and human lives',
+      'business': 'Economic stability and livelihoods',
+      'protests': 'Social progress and civil order',
+      'civil rights': 'Human dignity and constitutional rights',
+      'labor': 'Worker welfare and economic fairness',
+      'education': 'Future generations and social mobility'
+    };
+    
+    for (const theme of themes) {
+      const lowerTheme = theme.toLowerCase();
+      for (const [key, stakes] of Object.entries(stakesMap)) {
+        if (lowerTheme.includes(key)) {
+          return stakes;
+        }
+      }
+    }
+    
+    // Default stakes based on historical period
+    if (year >= 1940) return 'Wartime unity and national purpose';
+    if (year >= 1930) return 'Economic recovery and social stability';
+    if (year >= 1920) return 'Modern progress and traditional values';
+    return 'Community values and social order';
+  }
+
+  /**
+   * Identify visual elements from themes and location
+   */
+  private identifyVisualElementsFromThemes(themes: string[], location?: string): string[] {
+    const visualElements: string[] = [];
+    
+    // Theme-based visual elements
+    const themeVisuals: Record<string, string[]> = {
+      'politics': ['campaign rallies', 'government buildings', 'voting scenes'],
+      'crime': ['courtrooms', 'police stations', 'crime scenes'],
+      'war': ['military parades', 'training camps', 'victory celebrations'],
+      'business': ['factories', 'storefronts', 'business districts'],
+      'protests': ['demonstrations', 'picket lines', 'rally crowds'],
+      'education': ['schools', 'classrooms', 'graduation ceremonies'],
+      'entertainment': ['theaters', 'concert halls', 'performance venues']
+    };
+    
+    for (const theme of themes) {
+      const lowerTheme = theme.toLowerCase();
+      for (const [key, visuals] of Object.entries(themeVisuals)) {
+        if (lowerTheme.includes(key)) {
+          visualElements.push(...visuals);
+        }
+      }
+    }
+    
+    // Location-based visual elements
+    if (location) {
+      visualElements.push(`${location} landmarks`, `${location} streetscapes`);
+    }
+    
+    // Default Atlanta visuals
+    visualElements.push('Atlanta Constitution building', 'downtown Atlanta', 'historic neighborhoods');
+    
+    return [...new Set(visualElements)].slice(0, 5); // Remove duplicates and limit
   }
 
   /**
@@ -89,14 +458,12 @@ export class ClaudeNarrativeService {
     // Year range filtering  
     if (yearRange !== 'all') {
       const yearRanges: Record<string, string[]> = {
-        '1920-1925': ['1920-01-01', '1925-12-31'],
-        '1925-1930': ['1925-01-01', '1930-12-31'],
-        '1930-1935': ['1930-01-01', '1935-12-31'], 
-        '1935-1940': ['1935-01-01', '1940-12-31'],
-        '1940-1945': ['1940-01-01', '1945-12-31'],
-        '1945-1950': ['1945-01-01', '1950-12-31'],
-        '1950-1955': ['1950-01-01', '1955-12-31'],
-        '1955-1961': ['1955-01-01', '1961-12-31']
+        '1890-1900': ['1890-01-01', '1900-12-31'],
+        '1900-1910': ['1900-01-01', '1910-12-31'],
+        '1910-1920': ['1910-01-01', '1920-12-31'],
+        '1920-1930': ['1920-01-01', '1930-12-31'],
+        '1930-1940': ['1930-01-01', '1940-12-31'],
+        '1940-1950': ['1940-01-01', '1950-12-31']
       };
 
       if (yearRanges[yearRange]) {
@@ -1376,15 +1743,13 @@ Return JSON (no other text):
         { id: 'entertainment', name: 'Entertainment', description: 'Theater, music, cultural events' }
       ],
       yearRanges: [
-        { id: 'all', name: 'All Years (1920-1961)', count: '282K+' },
-        { id: '1920-1925', name: '1920-1925', description: 'Post-WWI, Roaring Twenties' },
-        { id: '1925-1930', name: '1925-1930', description: 'Prosperity Era' },
-        { id: '1930-1935', name: '1930-1935', description: 'Great Depression Begins' },
-        { id: '1935-1940', name: '1935-1940', description: 'New Deal Era' },
-        { id: '1940-1945', name: '1940-1945', description: 'World War II' },
-        { id: '1945-1950', name: '1945-1950', description: 'Post-war Transition' },
-        { id: '1950-1955', name: '1950-1955', description: 'Korean War, Prosperity' },
-        { id: '1955-1961', name: '1955-1961', description: 'Civil Rights Era Begins' }
+        { id: 'all', name: 'All Years (1890-1950)', count: '282K+' },
+        { id: '1890-1900', name: '1890-1900', description: 'Gilded Age, Industrial Growth' },
+        { id: '1900-1910', name: '1900-1910', description: 'Progressive Era Begins' },
+        { id: '1910-1920', name: '1910-1920', description: 'WWI Era, Social Change' },
+        { id: '1920-1930', name: '1920-1930', description: 'Roaring Twenties, Prosperity' },
+        { id: '1930-1940', name: '1930-1940', description: 'Great Depression, New Deal' },
+        { id: '1940-1950', name: '1940-1950', description: 'WWII, Post-war Transition' }
       ]
     };
   }

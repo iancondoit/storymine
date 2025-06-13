@@ -189,11 +189,14 @@ const JordiDashboard: React.FC = () => {
                 <h1 className="text-4xl font-display font-bold text-dark-900 dark:text-white flex items-center">
                   🎬 Jordi
                   <span className="ml-3 text-sm font-normal text-dark-500 dark:text-dark-400 bg-dark-100 dark:bg-dark-700 px-3 py-1 rounded-md">
-                    v3.1.3-BUILD-{new Date().getTime()}
+                    v4.0.0-AWS
+                  </span>
+                  <span className="ml-2 text-xs font-normal text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-2 py-1 rounded-md">
+                    ✅ AWS Intelligence
                   </span>
                 </h1>
                 <p className="mt-2 text-xl text-dark-600 dark:text-dark-300">
-                  Documentary Story Discovery • 282,388 Atlanta Constitution articles (1920-1961)
+                  Documentary Story Discovery • 282,388 Atlanta Constitution articles (1890-1950) • Pre-Scored Intelligence
                 </p>
                 
                 {/* Mathematical formula for effect */}
