@@ -50,12 +50,18 @@ export class ClaudeNarrativeService {
    * Leverages documentary_potential and narrative_score fields (guaranteed non-null)
    */
   private async getPreScoredStoryOptions(category: string, yearRange: string, count: number) {
-    console.log(`🎬 JORDI INTELLIGENCE: Using AWS pre-scored articles for documentary discovery`);
+    console.log(`🎬 JORDI INTELLIGENCE: Using AWS pre-scored articles with StoryMap quality filters`);
     console.log(`📊 Target: ${count} stories from category: ${category}, period: ${yearRange}`);
 
-    let whereClause = 'WHERE documentary_potential IS NOT NULL AND narrative_score IS NOT NULL';
-    whereClause += ` AND documentary_potential >= 0.5`; // Minimum quality threshold
-    whereClause += ` AND narrative_score >= 0.4`; // Minimum narrative potential
+    // STORYMAP INTELLIGENCE RECOMMENDED FILTERS - Use their exact quality filtering approach
+    let whereClause = 'WHERE documentary_potential >= 0.6';
+    whereClause += ` AND narrative_score >= 0.5`;
+    whereClause += ` AND LENGTH(title) >= 15`;
+    whereClause += ` AND LENGTH(title) <= 100`;
+    whereClause += ` AND title NOT ILIKE '%ofthe%'`;
+    whereClause += ` AND title NOT ILIKE '%inthe%'`;
+    whereClause += ` AND title NOT ILIKE '%by %'`;
+    whereClause += ` AND title NOT ILIKE '%weather%'`;
     
     const params: any[] = [];
 
@@ -119,10 +125,8 @@ export class ClaudeNarrativeService {
       FROM intelligence_articles
       ${whereClause}
       ORDER BY 
-        (documentary_potential * 0.6 + narrative_score * 0.4) DESC,
-        documentary_potential DESC,
-        narrative_score DESC,
-        RANDOM()
+        documentary_potential DESC, 
+        narrative_score DESC
       LIMIT $${params.length + 1}
       OFFSET $${params.length + 2}
     `;
@@ -340,33 +344,25 @@ export class ClaudeNarrativeService {
 
   /**
    * Enhance documentary title using themes and year
+   * Now trusts StoryMap Intelligence filtered data - should receive clean titles
    */
   private enhanceDocumentaryTitle(originalTitle: string, themes: string[], year: number): string {
-    // Check if title is corrupted OCR data
-    if (this.isTitleCorrupted(originalTitle)) {
-      console.log(`🔧 Detected corrupted title: "${originalTitle}" - generating new title`);
-      return this.createDocumentaryTitle('', '', year);
-    }
-    
-    // Use the original article title if it's meaningful
-    if (originalTitle && originalTitle.length > 10 && !originalTitle.includes('Untitled')) {
-      // Clean up the original title
+    // With StoryMap Intelligence quality filters, we should receive clean titles
+    // Only do minimal cleanup of newspaper artifacts
+    if (originalTitle && originalTitle.length >= 15) {
       let cleanTitle = originalTitle.trim();
       
-      // Remove common newspaper artifacts
+      // Remove only obvious newspaper artifacts (not content)
       cleanTitle = cleanTitle.replace(/^(THE CONSTITUTION|ATLANTA CONSTITUTION)[,\s]*/i, '');
       cleanTitle = cleanTitle.replace(/\s*-\s*Page\s*\d+/i, '');
       cleanTitle = cleanTitle.replace(/\s*\(\d{4}\)\s*$/, '');
       cleanTitle = cleanTitle.replace(/^["']|["']$/g, ''); // Remove quotes
       
-      // If the cleaned title is still meaningful, use it
-      if (cleanTitle.length > 10 && !this.isTitleCorrupted(cleanTitle)) {
-        return cleanTitle;
-      }
+      return cleanTitle.trim() || originalTitle;
     }
     
-    // Fallback to creating a documentary title
-    return this.createDocumentaryTitle(originalTitle, '', year);
+    // Only fallback if title is genuinely missing
+    return originalTitle || `Historical Story from ${year}`;
   }
 
   /**
