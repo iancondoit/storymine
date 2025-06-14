@@ -256,24 +256,33 @@ export class ClaudeNarrativeService {
       const contentLower = content.toLowerCase();
       let summary = '';
       
-      // Theme-specific summaries
-      if (themes.includes('Politics') || contentLower.includes('election') || contentLower.includes('mayor')) {
-        summary = `A political story from ${year} documenting electoral dynamics and governance in ${location}.`;
-      } else if (themes.includes('Crime') || contentLower.includes('murder') || contentLower.includes('trial')) {
-        summary = `A crime and justice story from ${year} revealing the legal system and social tensions in ${location}.`;
-      } else if (themes.includes('War') || contentLower.includes('war') || contentLower.includes('military')) {
-        summary = `A wartime story from ${year} capturing the impact of military conflict on ${location} and its residents.`;
-      } else if (themes.includes('Business') || contentLower.includes('company') || contentLower.includes('industry')) {
-        summary = `An economic story from ${year} documenting business development and industrial growth in ${location}.`;
-      } else if (themes.includes('Women') || contentLower.includes('women') || contentLower.includes('suffrage')) {
-        summary = `A story of women's experiences and social change in ${year} ${location}, documenting evolving gender roles.`;
+      // Analyze content for specific story elements
+      if (contentLower.includes('labor') || contentLower.includes('union') || contentLower.includes('strike')) {
+        summary = `A labor story from ${year} documenting worker organizing and industrial relations in ${location}.`;
+      } else if (contentLower.includes('murder') || contentLower.includes('killed') || contentLower.includes('death')) {
+        summary = `A crime story from ${year} involving violence and its impact on the ${location} community.`;
+      } else if (contentLower.includes('war') || contentLower.includes('military') || contentLower.includes('soldier')) {
+        summary = `A wartime story from ${year} documenting military events and their effects on ${location}.`;
+      } else if (contentLower.includes('election') || contentLower.includes('governor') || contentLower.includes('political')) {
+        summary = `A political story from ${year} covering electoral politics and governance in ${location}.`;
+      } else if (contentLower.includes('business') || contentLower.includes('company') || contentLower.includes('economic')) {
+        summary = `An economic story from ${year} documenting business and commercial developments in ${location}.`;
+      } else if (contentLower.includes('women') || contentLower.includes('wife') || contentLower.includes('mother')) {
+        summary = `A social story from ${year} focusing on women's experiences and family life in ${location}.`;
+      } else if (contentLower.includes('school') || contentLower.includes('education') || contentLower.includes('student')) {
+        summary = `An education story from ${year} documenting learning and institutional development in ${location}.`;
+      } else if (contentLower.includes('fire') || contentLower.includes('accident') || contentLower.includes('disaster')) {
+        summary = `A disaster story from ${year} documenting emergency events and community response in ${location}.`;
+      } else if (contentLower.includes('court') || contentLower.includes('trial') || contentLower.includes('judge')) {
+        summary = `A legal story from ${year} documenting judicial proceedings and justice in ${location}.`;
       } else {
-        // Generic but varied summary
+        // Create varied summaries based on year and themes
+        const eraContext = this.getEraContext(year);
         const summaryTemplates = [
-          `A historical account from ${year} that illuminates daily life and social dynamics in ${location}.`,
-          `A documentary-worthy story from ${year} capturing the spirit and challenges of the era in ${location}.`,
-          `An engaging narrative from ${year} that reveals the human experience during this period in ${location}.`,
-          `A compelling story from ${year} documenting significant events and social change in ${location}.`
+          `A ${eraContext} story from ${year} documenting daily life and social change in ${location}.`,
+          `A historical account from ${year} revealing the challenges and opportunities of ${eraContext} in ${location}.`,
+          `A compelling narrative from ${year} that captures the spirit of ${eraContext} in ${location}.`,
+          `A documentary-worthy story from ${year} illuminating the human experience during ${eraContext} in ${location}.`
         ];
         summary = summaryTemplates[Math.floor(Math.random() * summaryTemplates.length)];
       }
@@ -333,6 +342,12 @@ export class ClaudeNarrativeService {
    * Enhance documentary title using themes and year
    */
   private enhanceDocumentaryTitle(originalTitle: string, themes: string[], year: number): string {
+    // Check if title is corrupted OCR data
+    if (this.isTitleCorrupted(originalTitle)) {
+      console.log(`🔧 Detected corrupted title: "${originalTitle}" - generating new title`);
+      return this.createDocumentaryTitle('', '', year);
+    }
+    
     // Use the original article title if it's meaningful
     if (originalTitle && originalTitle.length > 10 && !originalTitle.includes('Untitled')) {
       // Clean up the original title
@@ -342,15 +357,89 @@ export class ClaudeNarrativeService {
       cleanTitle = cleanTitle.replace(/^(THE CONSTITUTION|ATLANTA CONSTITUTION)[,\s]*/i, '');
       cleanTitle = cleanTitle.replace(/\s*-\s*Page\s*\d+/i, '');
       cleanTitle = cleanTitle.replace(/\s*\(\d{4}\)\s*$/, '');
+      cleanTitle = cleanTitle.replace(/^["']|["']$/g, ''); // Remove quotes
       
       // If the cleaned title is still meaningful, use it
-      if (cleanTitle.length > 10) {
+      if (cleanTitle.length > 10 && !this.isTitleCorrupted(cleanTitle)) {
         return cleanTitle;
       }
     }
     
-    // Fallback to creating a documentary title only if original is poor
+    // Fallback to creating a documentary title
     return this.createDocumentaryTitle(originalTitle, '', year);
+  }
+
+  /**
+   * Detect if a title is corrupted OCR data
+   */
+  private isTitleCorrupted(title: string): boolean {
+    if (!title) return true;
+    
+    const lowerTitle = title.toLowerCase();
+    
+    // Check for OCR corruption patterns
+    const corruptionPatterns = [
+      // Fragment indicators
+      /^(a|an|the|and|or|but|in|on|at|to|for|of|with|by)\s/i,
+      // Incomplete sentences
+      /\s(he|she|it|they|we|you|i)\s*$/i,
+      // OCR artifacts
+      /\s(ofthe|inthe|tothe|onthe|bythe|asthe)\s/i,
+      // Bylines and author indicators
+      /^(by\s|from\s|reports?\s)/i,
+      // Weather/page indicators
+      /^(reports?\s+of|weather\s+bureau|page\s+\d)/i,
+      // Incomplete quotes
+      /^[^"]*"[^"]*$/,
+      // Numbers at start (likely page numbers)
+      /^\d+\s/,
+      // All caps fragments
+      /^[A-Z\s]{3,15}$/,
+      // Ends with incomplete words
+      /\s(a|an|the|and|or|but|in|on|at|to|for|of|with|by)$/i
+    ];
+    
+    // Check for corruption patterns
+    for (const pattern of corruptionPatterns) {
+      if (pattern.test(title)) {
+        return true;
+      }
+    }
+    
+    // Check for excessive punctuation or weird characters
+    const punctuationRatio = (title.match(/[.,;:!?'"()-]/g) || []).length / title.length;
+    if (punctuationRatio > 0.3) {
+      return true;
+    }
+    
+    // Check for too many capital letters (OCR artifacts)
+    const capsRatio = (title.match(/[A-Z]/g) || []).length / title.length;
+    if (capsRatio > 0.7 && title.length > 10) {
+      return true;
+    }
+    
+    // Check for common OCR word concatenations
+    const ocrConcatenations = ['ofthe', 'inthe', 'tothe', 'onthe', 'bythe', 'asthe', 'atthe'];
+    for (const concat of ocrConcatenations) {
+      if (lowerTitle.includes(concat)) {
+        return true;
+      }
+    }
+    
+    return false;
+  }
+
+  /**
+   * Get era context for summary generation
+   */
+  private getEraContext(year: number): string {
+    if (year >= 1890 && year <= 1900) return 'Gilded Age';
+    if (year >= 1900 && year <= 1910) return 'Progressive Era';
+    if (year >= 1910 && year <= 1920) return 'World War I era';
+    if (year >= 1920 && year <= 1930) return 'Roaring Twenties';
+    if (year >= 1930 && year <= 1940) return 'Great Depression';
+    if (year >= 1940 && year <= 1950) return 'World War II era';
+    return 'mid-20th century';
   }
 
   /**

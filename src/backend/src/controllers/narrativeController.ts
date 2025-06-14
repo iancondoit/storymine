@@ -284,4 +284,57 @@ export const healthCheck = async (req: Request, res: Response): Promise<void> =>
       timestamp: new Date().toISOString()
     });
   }
+};
+
+/**
+ * DIAGNOSTIC: Raw data inspection
+ * Route: GET /api/narrative/debug
+ */
+export const debugRawData = async (req: Request, res: Response): Promise<void> => {
+  try {
+    console.log('🔍 Debug: Fetching raw AWS data...');
+    
+    const { query } = require('../database/connection');
+    
+    // Get a small sample of raw data
+    const rawQuery = `
+      SELECT 
+        storymap_id,
+        title,
+        LEFT(content, 500) as content_sample,
+        LENGTH(content) as content_length,
+        publication_date,
+        EXTRACT(YEAR FROM publication_date) as year,
+        documentary_potential,
+        narrative_score,
+        primary_themes,
+        secondary_themes,
+        primary_location
+      FROM intelligence_articles
+      WHERE documentary_potential IS NOT NULL 
+        AND narrative_score IS NOT NULL
+        AND title IS NOT NULL
+      ORDER BY documentary_potential DESC
+      LIMIT 5;
+    `;
+    
+    const result = await query(rawQuery);
+    
+    res.json({
+      success: true,
+      debug: {
+        totalRows: result.rows.length,
+        sampleData: result.rows,
+        timestamp: new Date().toISOString()
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Debug query failed:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Debug query failed',
+      message: (error as Error).message
+    });
+  }
 }; 
